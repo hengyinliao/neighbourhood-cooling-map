@@ -1,0 +1,4 @@
+name,feedback_type,description,best_for,latitude,longitude,source,verified,contact_or_session,notes
+Example: shady bench near Riley Park,good_rest_spot,Residents said this is a comfortable place to sit in hot weather,seniors; families,49.2447,-123.1032,workshop,false,example session,Replace or delete this example row
+Example: very hot sidewalk,hot_spot,Little shade and feels uncomfortable on hot afternoons,walkers; seniors,49.2524,-123.1151,questionnaire,false,example survey,Replace or delete this example row
+Example: water hard to find,needs_improvement,A resident suggested clearer signs for nearby drinking water,everyone,49.2492,-123.1017,workshop,false,example session,Replace or delete this example row

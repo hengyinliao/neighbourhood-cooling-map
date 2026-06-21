@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+
+# Local download/cache files. The script can recreate these.
+cache/
+data/raw/
+outputs/
+
+# Keep the GitHub Pages site folder tracked.
+!docs/
+!docs/index.html
+!docs/.nojekyll

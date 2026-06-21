@@ -927,6 +927,7 @@ def add_public_accessibility_controls(fmap: folium.Map) -> None:
       <p>Use this map to find nearby shade, water, washrooms, places to sit, civic buildings, and transit.</p>
       <p>Click a marker or park to see what it is. Search by park name if you already know the place you want.</p>
       <p class="technical-note">This is a community resource map. Please check opening hours and conditions before relying on a place during extreme heat.</p>
+      <p class="technical-note">Supported by Youth Small Neighbourhood Grant (YSNG).</p>
     </div>
 
     <div class="map-mode-panel" role="region" aria-label="Map display modes">

@@ -7,6 +7,8 @@ The script builds an "Existing / Mapped Resources" layer for the Little Mountain
 Riley Park / Cambie / Mount Pleasant area in Vancouver, BC. It is intended for a
 simple community-facing map, not a formal heat-risk or planning analysis.
 
+Supported by Youth Small Neighbourhood Grant (YSNG).
+
 ## What This Produces
 
 Run the workflow to create:

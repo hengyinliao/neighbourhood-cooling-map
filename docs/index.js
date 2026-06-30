@@ -56,6 +56,136 @@ document.addEventListener("DOMContentLoaded", function () {
         localStorage.setItem("coolingMapScenario", activeScenario);
     }
 
+    function setupLegendLayerBridge(attempt = 0) {
+        const legendButtons = Array.from(document.querySelectorAll(".legend-item[data-layer]"));
+        if (!legendButtons.length) return;
+
+        const normalize = (value) => (value || "").replace(/\s+/g, " ").trim();
+        const layerLabels = Array.from(document.querySelectorAll(".leaflet-control-layers-overlays label"));
+
+        if (!layerLabels.length) {
+            if (attempt < 60) {
+                window.setTimeout(() => setupLegendLayerBridge(attempt + 1), 50);
+            }
+            return;
+        }
+
+        const inputByLayer = new Map();
+        layerLabels.forEach((label) => {
+            const input = label.querySelector("input.leaflet-control-layers-selector");
+            if (!input) return;
+
+            const labelClone = label.cloneNode(true);
+            labelClone.querySelectorAll("input").forEach((inputNode) => inputNode.remove());
+            inputByLayer.set(normalize(labelClone.textContent), input);
+        });
+
+        const setLegendState = (layerName) => {
+            const input = inputByLayer.get(layerName);
+            if (!input) return;
+
+            legendButtons
+                .filter((button) => normalize(button.dataset.layer) === layerName)
+                .forEach((button) => {
+                    button.classList.toggle("is-off", !input.checked);
+                    button.setAttribute("aria-pressed", input.checked ? "true" : "false");
+                });
+        };
+
+        legendButtons.forEach((button) => {
+            const layerName = normalize(button.dataset.layer);
+            const input = inputByLayer.get(layerName);
+
+            if (!input) {
+                button.disabled = true;
+                button.setAttribute("aria-disabled", "true");
+                return;
+            }
+
+            button.setAttribute("aria-label", `Toggle ${normalize(button.textContent)}`);
+            setLegendState(layerName);
+            button.addEventListener("click", () => {
+                input.click();
+                setLegendState(layerName);
+            });
+        });
+
+        inputByLayer.forEach((input, layerName) => {
+            input.addEventListener("change", () => setLegendState(layerName));
+        });
+    }
+
+    function findLeafletSearchControl() {
+        for (const key in window) {
+            try {
+                const value = window[key];
+                if (
+                    value
+                    && typeof value.searchText === "function"
+                    && typeof value._handleKeypress === "function"
+                    && value._input?.classList?.contains("search-input")
+                ) {
+                    return value;
+                }
+            } catch {
+                // Some browser globals are not readable in all contexts.
+            }
+        }
+        return null;
+    }
+
+    function setupPanelSearchBridge(attempt = 0) {
+        const panelInput = document.querySelector("[data-leaflet-search]");
+        if (!panelInput) return;
+
+        const searchControl = findLeafletSearchControl();
+        if (!searchControl) {
+            if (attempt < 60) {
+                window.setTimeout(() => setupPanelSearchBridge(attempt + 1), 50);
+            }
+            return;
+        }
+
+        const pluginInput = searchControl._input;
+        const tooltip = searchControl._tooltip || document.querySelector(".leaflet-control-search .search-tooltip");
+        const bridge = panelInput.closest(".search-bridge");
+
+        if (tooltip && bridge && tooltip.parentElement !== bridge) {
+            tooltip.classList.add("panel-search-tooltip");
+            bridge.appendChild(tooltip);
+        }
+
+        if (pluginInput) {
+            pluginInput.setAttribute("aria-hidden", "true");
+            pluginInput.tabIndex = -1;
+        }
+
+        panelInput.addEventListener("input", () => {
+            searchControl.searchText(panelInput.value);
+        });
+
+        panelInput.addEventListener("keydown", (event) => {
+            if (event.key !== "Enter") return;
+
+            event.preventDefault();
+            searchControl.searchText(panelInput.value);
+            window.clearTimeout(searchControl.timerKeypress);
+            if (panelInput.value && typeof searchControl._fillRecordsCache === "function") {
+                searchControl._fillRecordsCache();
+            }
+            searchControl._handleKeypress({ keyCode: 13 });
+        });
+
+        if (typeof searchControl.on === "function") {
+            searchControl.on("search:locationfound", (event) => {
+                panelInput.value = event.text || searchControl._input?.value || panelInput.value;
+            });
+            searchControl.on("search:cancel", () => {
+                panelInput.value = "";
+            });
+        }
+    }
+
     buttons.forEach((button) => {
         button.addEventListener("click", function () {
             setMode(button.dataset.mode);
@@ -69,6 +199,8 @@ document.addEventListener("DOMContentLoaded", function () {
     });
     setMode(localStorage.getItem("coolingMapMode") || "standard");
     setScenario(localStorage.getItem("coolingMapScenario") || "all");
+    setupLegendLayerBridge();
+    setupPanelSearchBridge();
 
     // load weather data for Riley Park - Little Mountain
     const widget = document.querySelector(".weather-widget");

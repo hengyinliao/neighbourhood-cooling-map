@@ -677,7 +677,9 @@ def add_public_accessibility_controls(fmap: folium.Map) -> None:
       
       <section>
         <h2>Search</h2>
-        <input class="search" placeholder="Search location..." />
+        <div class="search-bridge">
+          <input class="search" data-leaflet-search placeholder="Search park name..." autocomplete="off" />
+        </div>
         <button class="location-btn">Use My Location</button>
       </section>
       
@@ -696,46 +698,46 @@ def add_public_accessibility_controls(fmap: folium.Map) -> None:
         <h2>Cooling Nearby</h2>
         <div class="legend" aria-label="What to look for">
           <div class="legend-items">
-            <div class="legend-item" style="--legend-color: #76c6ff;">
+            <button class="legend-item" type="button" data-layer="Community centres and libraries" style="--legend-color: #76c6ff;">
               <span class="legend-icon"><img src="assets/icons/tempLow.svg" alt="" /></span>
               <span>Community centres and libraries</span>
-            </div>
-            <div class="legend-item" style="--legend-color: #1366ff;">
+            </button>
+            <button class="legend-item" type="button" data-layer="Water fountains" style="--legend-color: #1366ff;">
               <span class="legend-icon"><img src="assets/icons/waterRefill.svg" alt="" /></span>
               <span>Drinking fountains</span>
-            </div>
-            <div class="legend-item" style="--legend-color: #7c5bd6;">
+            </button>
+            <button class="legend-item" type="button" data-layer="Public washrooms" style="--legend-color: #7c5bd6;">
               <span class="legend-icon"><img src="assets/icons/restroom.svg" alt="" /></span>
               <span>Public washrooms</span>
-            </div>
-            <div class="legend-item" style="--legend-color: #ec8f2a;">
+            </button>
+            <button class="legend-item" type="button" data-layer="Benches and places to sit" style="--legend-color: #ec8f2a;">
               <span class="legend-icon"><img src="assets/icons/chair.svg" alt="" /></span>
               <span>Benches and places to sit</span>
-            </div>
-            <div class="legend-item" style="--legend-color: #76afff;">
+            </button>
+            <button class="legend-item" type="button" data-layer="Bus and transit stops" style="--legend-color: #76afff;">
               <span class="legend-icon"><img src="assets/icons/bus.svg" alt="" /></span>
               <span>Transit stops</span>
-            </div>
-            <div class="legend-item" style="--legend-color: #1f5a9d;">
+            </button>
+            <button class="legend-item" type="button" data-layer="Train and rapid transit stations" style="--legend-color: #1f5a9d;">
               <span class="legend-icon"><img src="assets/icons/subway.svg" alt="" /></span>
               <span>SkyTrain or rapid transit station</span>
-            </div>
-            <div class="legend-item" style="--legend-color: #2fbf71;">
+            </button>
+            <button class="legend-item" type="button" data-layer="Resident feedback and workshop notes" style="--legend-color: #2fbf71;">
               <span class="legend-icon"><img src="assets/icons/thumbsUp.svg" alt="" /></span>
               <span>Resident recommended place</span>
-            </div>
-            <div class="legend-item" style="--legend-color: #f54b20;">
+            </button>
+            <button class="legend-item" type="button" data-layer="Resident feedback and workshop notes" style="--legend-color: #f54b20;">
               <span class="legend-icon"><img src="assets/icons/tempHigh.svg" alt="" /></span>
               <span>Resident identified hot spot</span>
-            </div>
-            <div class="legend-item" style="--legend-color: #ffd900;">
+            </button>
+            <button class="legend-item" type="button" data-layer="Resident feedback and workshop notes" style="--legend-color: #ffd900;">
               <span class="legend-icon"><img src="assets/icons/suggestion.svg" alt="" /></span>
               <span>Resident suggestion or need</span>
-            </div>
-            <div class="legend-item" style="--legend-color: #178f4c;">
+            </button>
+            <button class="legend-item" type="button" data-layer="Possible shady walking routes" style="--legend-color: #178f4c;">
               <span class="legend-route" aria-hidden="true"></span>
               <span>Possible shady walking route</span>
-            </div>
+            </button>
           </div>
         </div>
       </section>
@@ -751,8 +753,7 @@ def add_public_accessibility_controls(fmap: folium.Map) -> None:
 
 
 def make_map(project_area: gpd.GeoDataFrame, buffered_area: gpd.GeoDataFrame, layers: dict[str, gpd.GeoDataFrame]) -> Path:
-    center = project_area.to_crs(CRS_WGS84).geometry.iloc[0].centroid
-    fmap = folium.Map(location=[center.y, center.x], zoom_start=13, tiles="CartoDB positron")
+    fmap = folium.Map(location=[49.2528, -123.1049], zoom_start=15, tiles="CartoDB positron")
 
     folium.GeoJson(
         buffered_area,

@@ -114,6 +114,45 @@ p {
     margin-bottom: 10px;
 }
 
+.search-bridge {
+    position: relative;
+}
+
+.leaflet-control-search {
+    display: none;
+}
+
+.panel-search-tooltip {
+    position: absolute;
+    top: 42px;
+    left: 0;
+    right: 0;
+    z-index: 1002;
+    display: none;
+    max-height: 180px;
+    margin: 0;
+    padding: 4px;
+    overflow-y: auto;
+    list-style: none;
+    background: white;
+    border: 1px solid #d8e1ec;
+    border-radius: 8px;
+    box-shadow: 0 10px 22px rgba(31, 42, 68, 0.16);
+}
+
+.panel-search-tooltip .search-tip {
+    display: block;
+    padding: 8px 10px;
+    color: #1f2a44;
+    border-radius: 6px;
+    text-decoration: none;
+}
+
+.panel-search-tooltip .search-tip:hover,
+.panel-search-tooltip .search-tip-select {
+    background: #f0f5fb;
+}
+
 .panel section h2{
     font-size: 1.1rem;
     font-weight: 600;
@@ -238,6 +277,12 @@ button.extreme-heat.selected img {
     left: max(20%, 380px);
 }
 
+/* hide the default leaflet search control */
+
+.leaflet-control-layers {
+    display: none;
+}
+
 .legend {
     background: white;
     border: 0;
@@ -269,6 +314,22 @@ button.extreme-heat.selected img {
     font-size: 0.72rem;
     line-height: 1.2;
     text-align: center;
+    cursor: pointer;
+}
+
+.legend-item.is-off {
+    color: #6d7890;
+    opacity: 0.5;
+}
+
+.legend-item:focus-visible {
+    outline: 3px solid #1063c7;
+    outline-offset: 2px;
+}
+
+.legend-item:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
 }
 
 .legend-icon {

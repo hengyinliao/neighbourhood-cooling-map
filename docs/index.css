@@ -153,7 +153,6 @@ p {
     padding: 12px 6px;
     background: #f0f5fb;
     font-size: 0.8rem;
-    transition: background 0.2s ease-in-out, color 0.2s ease-in-out;
     cursor: pointer;
 }
 

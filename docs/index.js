@@ -106,10 +106,10 @@ document.addEventListener("DOMContentLoaded", function () {
             const isMorning = hour >= 5 && hour < 10;
             const isEvening = hour >= 18 && hour < 21;
             const heatGlow = {
-              mild: "rgba(87, 168, 217, 0.50)",
-              warm: "rgba(255, 180, 74, 0.50)",
-              hot: "rgba(255, 111, 48, 0.58)",
-              extreme: "rgba(209, 50, 38, 0.68)"
+              mild: "rgba(195, 229, 251, 0.50)",
+              warm: "rgba(253, 255, 198, 0.60)",
+              hot: "rgba(255, 213, 145, 0.78)",
+              extreme: "rgba(255, 248, 225, 1)"
             }[heat];
 
             if (isNight) {
@@ -117,14 +117,14 @@ document.addEventListener("DOMContentLoaded", function () {
             }
 
             if (isMorning) {
-              return `radial-gradient(circle at 22% 24%, ${heatGlow}, transparent 38%), linear-gradient(145deg, #287ab8, #80cfe5 58%, #ffd38a)`;
+              return `radial-gradient(circle at 76% 18%, ${heatGlow}, transparent 36%), linear-gradient(145deg, #19a4ff, #55bfe0 52%, #b3ffee)`;
             }
 
             if (isEvening) {
               return `radial-gradient(circle at 80% 22%, ${heatGlow}, transparent 36%), linear-gradient(145deg, #734d9f, #e07155 56%, #f7b660)`;
             }
 
-            return `radial-gradient(circle at 76% 18%, ${heatGlow}, transparent 36%), linear-gradient(145deg, #117bc1, #55bfe0 52%, #f8c35f)`;
+            return `radial-gradient(circle at 28% 18%, ${heatGlow}, transparent 36%), linear-gradient(145deg, #117bc1, #55bfe0 75%, #b7ebff)`;
           };
 
           const fetchWeather = async ({ latitude, longitude, label }) => {

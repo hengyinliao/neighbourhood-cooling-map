@@ -1,0 +1,296 @@
+:root {
+        --panel-bg: #ffffff;
+        --panel-text: #17202a;
+        --panel-border: #8a8f98;
+        --focus-ring: #111111;
+        --cooling: #0072b2;
+        --water: #009e73;
+        --washroom: #cc79a7;
+        --bench: #e69f00;
+        --transit: #d55e00;
+        --rapid: #000000;
+      }
+      body.access-senior {
+        font-size: 19px;
+      }
+      body.access-colorblind {
+        --cooling: #0072b2;
+        --water: #009e73;
+        --washroom: #cc79a7;
+        --bench: #f0e442;
+        --transit: #d55e00;
+        --rapid: #000000;
+      }
+      body.access-simple .leaflet-control-layers,
+      body.access-simple .technical-note {
+        display: none !important;
+      }
+      .map-intro-panel,
+      .map-mode-panel,
+      .map-legend-panel {
+        position: fixed;
+        z-index: 9999;
+        background: var(--panel-bg);
+        color: var(--panel-text);
+        border: 2px solid var(--panel-border);
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.22);
+        font-family: Arial, Helvetica, sans-serif;
+        line-height: 1.38;
+      }
+      .map-intro-panel {
+        top: 16px;
+        left: 56px;
+        max-width: 380px;
+        padding: 14px 16px;
+      }
+      .map-intro-panel h1 {
+        margin: 0 0 8px;
+        font-size: 20px;
+        line-height: 1.2;
+      }
+      .map-intro-panel p {
+        margin: 7px 0;
+      }
+      .map-intro-panel .technical-note {
+        color: #4c5967;
+        font-size: 12px;
+      }
+      .map-mode-panel {
+        top: 16px;
+        right: 16px;
+        max-width: 310px;
+        padding: 12px;
+      }
+      .map-mode-panel h2,
+      .map-legend-panel h2 {
+        margin: 0 0 8px;
+        font-size: 16px;
+      }
+      .mode-buttons {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .mode-buttons button {
+        border: 2px solid #4c5967;
+        background: #ffffff;
+        color: #111111;
+        border-radius: 6px;
+        padding: 8px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .mode-buttons button.active {
+        background: #111111;
+        color: #ffffff;
+      }
+      .mode-buttons button:focus {
+        outline: 3px solid var(--focus-ring);
+        outline-offset: 2px;
+      }
+      .mode-help {
+        margin: 8px 0 0;
+        font-size: 13px;
+        color: #4c5967;
+      }
+      .scenario-buttons {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 12px;
+        padding-top: 10px;
+        border-top: 1px solid #c8ccd2;
+      }
+      .scenario-buttons button {
+        border: 2px solid #4c5967;
+        background: #ffffff;
+        color: #111111;
+        border-radius: 6px;
+        padding: 8px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .scenario-buttons button.active {
+        background: #24415f;
+        color: #ffffff;
+      }
+      .scenario-buttons button:focus {
+        outline: 3px solid var(--focus-ring);
+        outline-offset: 2px;
+      }
+      .map-legend-panel {
+        bottom: 24px;
+        left: 24px;
+        max-width: 310px;
+        padding: 12px;
+      }
+      .legend-row {
+        display: grid;
+        grid-template-columns: 54px 1fr;
+        align-items: center;
+        gap: 8px;
+        margin: 6px 0;
+      }
+      .legend-sample {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 46px;
+        height: 28px;
+        border: 2px solid #111111;
+        border-radius: 999px;
+        color: #ffffff;
+        font-size: 11px;
+        font-weight: 800;
+      }
+      .legend-park {
+        background: #88c999;
+        color: #111111;
+      }
+      .legend-route {
+        background: repeating-linear-gradient(90deg, #005a32, #005a32 8px, #ffffff 8px, #ffffff 12px);
+      }
+      .cooling-map-marker {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 46px;
+        height: 46px;
+        border: 3px solid #111111;
+        border-radius: 999px;
+        color: #ffffff;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: 0;
+        box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+      }
+      .cooling-marker { background: var(--cooling); }
+      .water-marker { background: var(--water); }
+      .washroom-marker { background: var(--washroom); }
+      .bench-marker { background: var(--bench); color: #111111; }
+      .transit-marker { background: var(--transit); }
+      .rapid-marker { background: var(--rapid); }
+      .resident-good-marker { background: #6a3d9a; }
+      .resident-hot-marker { background: #b2182b; }
+      .resident-need-marker { background: #ffff99; color: #111111; }
+      .leaflet-control-search {
+        margin-top: 88px !important;
+        margin-left: 10px !important;
+        border: 2px solid var(--panel-border) !important;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22) !important;
+      }
+      .leaflet-control-search .search-input {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 15px;
+        min-width: 240px;
+      }
+      .cooling-div-icon {
+        background: transparent;
+        border: 0;
+      }
+      body.scenario-senior .transit-marker,
+      body.scenario-senior .rapid-marker,
+      body.scenario-senior .resident-good-marker,
+      body.scenario-senior .resident-hot-marker,
+      body.scenario-senior .resident-need-marker {
+        opacity: 0.35;
+      }
+      body.scenario-family .bench-marker,
+      body.scenario-family .transit-marker,
+      body.scenario-family .rapid-marker,
+      body.scenario-family .resident-hot-marker {
+        opacity: 0.38;
+      }
+      body.scenario-heat .bench-marker,
+      body.scenario-heat .resident-good-marker,
+      body.scenario-heat .resident-need-marker {
+        opacity: 0.28;
+      }
+      body.scenario-resident .cooling-marker,
+      body.scenario-resident .water-marker,
+      body.scenario-resident .washroom-marker,
+      body.scenario-resident .bench-marker,
+      body.scenario-resident .transit-marker,
+      body.scenario-resident .rapid-marker {
+        opacity: 0.28;
+      }
+      .leaflet-popup-content {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 15px;
+        line-height: 1.4;
+      }
+      .popup-title {
+        font-size: 17px;
+        font-weight: 800;
+        margin-bottom: 6px;
+      }
+      .popup-source {
+        margin-top: 8px;
+        color: #4c5967;
+        font-size: 12px;
+      }
+      body.access-senior .map-intro-panel,
+      body.access-senior .map-mode-panel,
+      body.access-senior .map-legend-panel,
+      body.access-senior .leaflet-control-layers,
+      body.access-senior .leaflet-popup-content {
+        font-size: 19px;
+      }
+      body.access-senior .map-intro-panel h1 {
+        font-size: 25px;
+      }
+      body.access-senior .cooling-map-marker {
+        width: 58px;
+        height: 58px;
+        font-size: 12px;
+      }
+      body.access-senior .mode-buttons {
+        grid-template-columns: 1fr;
+      }
+      body.access-senior .scenario-buttons {
+        grid-template-columns: 1fr;
+      }
+      body.access-colorblind .map-intro-panel,
+      body.access-colorblind .map-mode-panel,
+      body.access-colorblind .map-legend-panel,
+      body.access-colorblind .cooling-map-marker {
+        border-color: #000000;
+      }
+      body.access-simple .map-intro-panel {
+        max-width: 430px;
+      }
+      body.access-simple .map-legend-panel {
+        font-size: 17px;
+      }
+      @media (max-width: 760px) {
+        .map-intro-panel,
+        .map-mode-panel,
+        .map-legend-panel {
+          left: 10px;
+          right: 10px;
+          max-width: none;
+        }
+        .map-intro-panel {
+          top: 10px;
+        }
+        .map-mode-panel {
+          top: auto;
+          bottom: 175px;
+        }
+        .map-legend-panel {
+          bottom: 10px;
+        }
+        .mode-buttons {
+          grid-template-columns: 1fr 1fr;
+        }
+        .scenario-buttons {
+          grid-template-columns: 1fr 1fr;
+        }
+        .leaflet-control-search {
+          margin-top: 136px !important;
+        }
+        .leaflet-control-search .search-input {
+          min-width: 190px;
+        }
+      }

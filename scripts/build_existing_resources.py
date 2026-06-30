@@ -69,54 +69,63 @@ CITY_DATASETS = {
 POINT_STYLES = {
     "cooling": {
         "label": "COOL",
+        "icon": "assets/icons/tempLow.svg",
         "class": "cooling-marker",
         "popup_type": "Cooling place",
         "plain_help": "A community centre or library that may be useful during hot weather. Check current opening hours before going.",
     },
     "water": {
         "label": "WATER",
+        "icon": "assets/icons/waterRefill.svg",
         "class": "water-marker",
         "popup_type": "Water",
         "plain_help": "A public drinking fountain or bottle filling location.",
     },
     "washroom": {
         "label": "WC",
+        "icon": "assets/icons/restroom.svg",
         "class": "washroom-marker",
         "popup_type": "Washroom",
         "plain_help": "A public washroom. Hours and access may change by season.",
     },
     "bench": {
         "label": "SIT",
+        "icon": "assets/icons/chair.svg",
         "class": "bench-marker",
         "popup_type": "Place to sit",
         "plain_help": "A mapped bench or place to sit from OpenStreetMap.",
     },
     "bus": {
         "label": "BUS",
+        "icon": "assets/icons/bus.svg",
         "class": "transit-marker",
         "popup_type": "Transit stop",
         "plain_help": "A mapped bus or transit stop from OpenStreetMap.",
     },
     "train": {
         "label": "TRAIN",
+        "icon": "assets/icons/subway.svg",
         "class": "rapid-marker",
         "popup_type": "Train or rapid transit station",
         "plain_help": "A SkyTrain or rapid transit station.",
     },
     "resident_good": {
         "label": "GOOD",
+        "icon": "assets/icons/thumbsUp.svg",
         "class": "resident-good-marker",
         "popup_type": "Resident-recommended place",
         "plain_help": "A place residents identified as useful, comfortable, or worth knowing about.",
     },
     "resident_hot": {
         "label": "HOT",
+        "icon": "assets/icons/tempHigh.svg",
         "class": "resident-hot-marker",
         "popup_type": "Resident-identified hot spot",
         "plain_help": "A place residents identified as hot, uncomfortable, or needing attention.",
     },
     "resident_need": {
         "label": "NEED",
+        "icon": "assets/icons/suggestion.svg",
         "class": "resident-need-marker",
         "popup_type": "Resident suggestion",
         "plain_help": "A place residents suggested for improvement, clearer information, or future action.",
@@ -557,12 +566,21 @@ def popup_html(row: pd.Series, plain_type: str, plain_help: str) -> str:
     """
 
 
+def point_style_icon_html(style: dict[str, str]) -> str:
+    return (
+        f'<img src="{escape(style["icon"])}" '
+        'alt="" '
+        'aria-hidden="true" />'
+    )
+
+
 def marker_icon(style_key: str) -> folium.DivIcon:
     style = POINT_STYLES[style_key]
     return folium.DivIcon(
         html=(
             f'<div class="cooling-map-marker {style["class"]}" '
-            f'aria-label="{escape(style["popup_type"])}">{style["label"]}</div>'
+            f'aria-label="{escape(style["popup_type"])}">'
+            f'{point_style_icon_html(style)}</div>'
         ),
         icon_size=(46, 46),
         icon_anchor=(23, 23),
@@ -620,412 +638,111 @@ def add_resident_input_layer(fmap: folium.Map, gdf: gpd.GeoDataFrame) -> None:
 
 def add_public_accessibility_controls(fmap: folium.Map) -> None:
     """Add public-facing guidance and visual modes to the generated HTML map."""
-    css = """
-    <style>
-      :root {
-        --panel-bg: #ffffff;
-        --panel-text: #17202a;
-        --panel-border: #8a8f98;
-        --focus-ring: #111111;
-        --cooling: #0072b2;
-        --water: #009e73;
-        --washroom: #cc79a7;
-        --bench: #e69f00;
-        --transit: #d55e00;
-        --rapid: #000000;
-      }
-      body.access-senior {
-        font-size: 19px;
-      }
-      body.access-colorblind {
-        --cooling: #0072b2;
-        --water: #009e73;
-        --washroom: #cc79a7;
-        --bench: #f0e442;
-        --transit: #d55e00;
-        --rapid: #000000;
-      }
-      body.access-simple .leaflet-control-layers,
-      body.access-simple .technical-note {
-        display: none !important;
-      }
-      .map-intro-panel,
-      .map-mode-panel,
-      .map-legend-panel {
-        position: fixed;
-        z-index: 9999;
-        background: var(--panel-bg);
-        color: var(--panel-text);
-        border: 2px solid var(--panel-border);
-        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.22);
-        font-family: Arial, Helvetica, sans-serif;
-        line-height: 1.38;
-      }
-      .map-intro-panel {
-        top: 16px;
-        left: 56px;
-        max-width: 380px;
-        padding: 14px 16px;
-      }
-      .map-intro-panel h1 {
-        margin: 0 0 8px;
-        font-size: 20px;
-        line-height: 1.2;
-      }
-      .map-intro-panel p {
-        margin: 7px 0;
-      }
-      .map-intro-panel .technical-note {
-        color: #4c5967;
-        font-size: 12px;
-      }
-      .map-mode-panel {
-        top: 16px;
-        right: 16px;
-        max-width: 310px;
-        padding: 12px;
-      }
-      .map-mode-panel h2,
-      .map-legend-panel h2 {
-        margin: 0 0 8px;
-        font-size: 16px;
-      }
-      .mode-buttons {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-      }
-      .mode-buttons button {
-        border: 2px solid #4c5967;
-        background: #ffffff;
-        color: #111111;
-        border-radius: 6px;
-        padding: 8px;
-        font-weight: 700;
-        cursor: pointer;
-      }
-      .mode-buttons button.active {
-        background: #111111;
-        color: #ffffff;
-      }
-      .mode-buttons button:focus {
-        outline: 3px solid var(--focus-ring);
-        outline-offset: 2px;
-      }
-      .mode-help {
-        margin: 8px 0 0;
-        font-size: 13px;
-        color: #4c5967;
-      }
-      .scenario-buttons {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-        margin-top: 12px;
-        padding-top: 10px;
-        border-top: 1px solid #c8ccd2;
-      }
-      .scenario-buttons button {
-        border: 2px solid #4c5967;
-        background: #ffffff;
-        color: #111111;
-        border-radius: 6px;
-        padding: 8px;
-        font-weight: 700;
-        cursor: pointer;
-      }
-      .scenario-buttons button.active {
-        background: #24415f;
-        color: #ffffff;
-      }
-      .scenario-buttons button:focus {
-        outline: 3px solid var(--focus-ring);
-        outline-offset: 2px;
-      }
-      .map-legend-panel {
-        bottom: 24px;
-        left: 24px;
-        max-width: 310px;
-        padding: 12px;
-      }
-      .legend-row {
-        display: grid;
-        grid-template-columns: 54px 1fr;
-        align-items: center;
-        gap: 8px;
-        margin: 6px 0;
-      }
-      .legend-sample {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 46px;
-        height: 28px;
-        border: 2px solid #111111;
-        border-radius: 999px;
-        color: #ffffff;
-        font-size: 11px;
-        font-weight: 800;
-      }
-      .legend-park {
-        background: #88c999;
-        color: #111111;
-      }
-      .legend-route {
-        background: repeating-linear-gradient(90deg, #005a32, #005a32 8px, #ffffff 8px, #ffffff 12px);
-      }
-      .cooling-map-marker {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 46px;
-        height: 46px;
-        border: 3px solid #111111;
-        border-radius: 999px;
-        color: #ffffff;
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 10px;
-        font-weight: 900;
-        letter-spacing: 0;
-        box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
-      }
-      .cooling-marker { background: var(--cooling); }
-      .water-marker { background: var(--water); }
-      .washroom-marker { background: var(--washroom); }
-      .bench-marker { background: var(--bench); color: #111111; }
-      .transit-marker { background: var(--transit); }
-      .rapid-marker { background: var(--rapid); }
-      .resident-good-marker { background: #6a3d9a; }
-      .resident-hot-marker { background: #b2182b; }
-      .resident-need-marker { background: #ffff99; color: #111111; }
-      .leaflet-control-search {
-        margin-top: 88px !important;
-        margin-left: 10px !important;
-        border: 2px solid var(--panel-border) !important;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22) !important;
-      }
-      .leaflet-control-search .search-input {
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 15px;
-        min-width: 240px;
-      }
-      .cooling-div-icon {
-        background: transparent;
-        border: 0;
-      }
-      body.scenario-senior .transit-marker,
-      body.scenario-senior .rapid-marker,
-      body.scenario-senior .resident-good-marker,
-      body.scenario-senior .resident-hot-marker,
-      body.scenario-senior .resident-need-marker {
-        opacity: 0.35;
-      }
-      body.scenario-family .bench-marker,
-      body.scenario-family .transit-marker,
-      body.scenario-family .rapid-marker,
-      body.scenario-family .resident-hot-marker {
-        opacity: 0.38;
-      }
-      body.scenario-heat .bench-marker,
-      body.scenario-heat .resident-good-marker,
-      body.scenario-heat .resident-need-marker {
-        opacity: 0.28;
-      }
-      body.scenario-resident .cooling-marker,
-      body.scenario-resident .water-marker,
-      body.scenario-resident .washroom-marker,
-      body.scenario-resident .bench-marker,
-      body.scenario-resident .transit-marker,
-      body.scenario-resident .rapid-marker {
-        opacity: 0.28;
-      }
-      .leaflet-popup-content {
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 15px;
-        line-height: 1.4;
-      }
-      .popup-title {
-        font-size: 17px;
-        font-weight: 800;
-        margin-bottom: 6px;
-      }
-      .popup-source {
-        margin-top: 8px;
-        color: #4c5967;
-        font-size: 12px;
-      }
-      body.access-senior .map-intro-panel,
-      body.access-senior .map-mode-panel,
-      body.access-senior .map-legend-panel,
-      body.access-senior .leaflet-control-layers,
-      body.access-senior .leaflet-popup-content {
-        font-size: 19px;
-      }
-      body.access-senior .map-intro-panel h1 {
-        font-size: 25px;
-      }
-      body.access-senior .cooling-map-marker {
-        width: 58px;
-        height: 58px;
-        font-size: 12px;
-      }
-      body.access-senior .mode-buttons {
-        grid-template-columns: 1fr;
-      }
-      body.access-senior .scenario-buttons {
-        grid-template-columns: 1fr;
-      }
-      body.access-colorblind .map-intro-panel,
-      body.access-colorblind .map-mode-panel,
-      body.access-colorblind .map-legend-panel,
-      body.access-colorblind .cooling-map-marker {
-        border-color: #000000;
-      }
-      body.access-simple .map-intro-panel {
-        max-width: 430px;
-      }
-      body.access-simple .map-legend-panel {
-        font-size: 17px;
-      }
-      @media (max-width: 760px) {
-        .map-intro-panel,
-        .map-mode-panel,
-        .map-legend-panel {
-          left: 10px;
-          right: 10px;
-          max-width: none;
-        }
-        .map-intro-panel {
-          top: 10px;
-        }
-        .map-mode-panel {
-          top: auto;
-          bottom: 175px;
-        }
-        .map-legend-panel {
-          bottom: 10px;
-        }
-        .mode-buttons {
-          grid-template-columns: 1fr 1fr;
-        }
-        .scenario-buttons {
-          grid-template-columns: 1fr 1fr;
-        }
-        .leaflet-control-search {
-          margin-top: 136px !important;
-        }
-        .leaflet-control-search .search-input {
-          min-width: 190px;
-        }
-      }
-    </style>
-    """
+    css = '<link rel="stylesheet" href="index.css" />'
+
+    script = '<script src="index.js"></script>'
 
     panels = """
-    <div class="map-intro-panel" role="region" aria-label="Map introduction">
-      <h1>Our Neighbourhood Cooling Map</h1>
-      <p>Use this map to find nearby shade, water, washrooms, places to sit, civic buildings, and transit.</p>
-      <p>Click a marker or park to see what it is. Search by park name if you already know the place you want.</p>
-      <p class="technical-note">This is a community resource map. Please check opening hours and conditions before relying on a place during extreme heat.</p>
-      <p class="technical-note">Supported by Youth Small Neighbourhood Grant (YSNG).</p>
-    </div>
+    <main class="app">
 
-    <div class="map-mode-panel" role="region" aria-label="Map display modes">
-      <h2>Display mode</h2>
-      <div class="mode-buttons">
-        <button type="button" class="active" data-mode="standard">Standard</button>
-        <button type="button" data-mode="senior">Large text</button>
-        <button type="button" data-mode="colorblind">High contrast</button>
-        <button type="button" data-mode="simple">Simple view</button>
-      </div>
-      <p class="mode-help" id="mode-help">Choose a display mode. Markers use both words and colors so they are easier to read.</p>
-      <h2 style="margin-top: 12px;">Scenario</h2>
-      <div class="scenario-buttons">
-        <button type="button" class="active" data-scenario="all">All</button>
-        <button type="button" data-scenario="senior">Senior</button>
-        <button type="button" data-scenario="family">Family</button>
-        <button type="button" data-scenario="heat">Extreme heat</button>
-        <button type="button" data-scenario="resident">Resident input</button>
-      </div>
-      <p class="mode-help" id="scenario-help">Choose a scenario to highlight the most relevant markers.</p>
-    </div>
 
-    <div class="map-legend-panel" role="region" aria-label="Map legend">
-      <h2>What to look for</h2>
-      <div class="legend-row"><span class="legend-sample cooling-marker">COOL</span><span>Community centres and libraries</span></div>
-      <div class="legend-row"><span class="legend-sample water-marker">WATER</span><span>Drinking fountains</span></div>
-      <div class="legend-row"><span class="legend-sample washroom-marker">WC</span><span>Public washrooms</span></div>
-      <div class="legend-row"><span class="legend-sample bench-marker">SIT</span><span>Benches and places to sit</span></div>
-      <div class="legend-row"><span class="legend-sample transit-marker">BUS</span><span>Transit stops</span></div>
-      <div class="legend-row"><span class="legend-sample rapid-marker">TRAIN</span><span>SkyTrain or rapid transit station</span></div>
-      <div class="legend-row"><span class="legend-sample resident-good-marker">GOOD</span><span>Resident recommended place</span></div>
-      <div class="legend-row"><span class="legend-sample resident-hot-marker">HOT</span><span>Resident identified hot spot</span></div>
-      <div class="legend-row"><span class="legend-sample resident-need-marker">NEED</span><span>Resident suggestion or need</span></div>
-      <div class="legend-row"><span class="legend-sample legend-park">PARK</span><span>Parks and green spaces</span></div>
-      <div class="legend-row"><span class="legend-sample legend-route">SHADE</span><span>Possible shady walking route</span></div>
-    </div>
+    <aside class="panel left-panel">
+      <div class="logo-container">
+        <img src="assets/logo.svg" alt="Our Neighbourhood Cooling Map logo" />
+        <p>Find cool places.<br>Stay safe.<br>Help our community.</p>
+      </div>
+
+      <section class="weather-widget" aria-label="Current weather" aria-live="polite">
+        <div class="weather-widget__header">
+          <span class="weather-widget__eyebrow">Current Weather</span>
+          <span class="weather-widget__condition" data-weather-cloud>Loading</span>
+        </div>
+
+        <div class="weather-widget__temp">
+          <span data-weather-temp>--</span><sup>°C</sup>
+        </div>
+
+        <div class="weather-widget__range">
+          <span>Low <strong data-weather-low>--°</strong></span>
+          <span>High <strong data-weather-high>--°</strong></span>
+        </div>
+
+        <div class="weather-widget__stats">
+          <span>Cloud <strong data-weather-cloud-cover>--%</strong></span>
+          <span>UV <strong data-weather-uv>--</strong></span>
+        </div>
+
+        <p class="weather-widget__status" data-weather-status>Fetching weather conditions...</p>
+      </section>
+      
+      <section>
+        <h2>Search</h2>
+        <input class="search" placeholder="Search location..." />
+        <button class="location-btn">Use My Location</button>
+      </section>
+      
+
+      <section>
+        <h2>Scenario</h2>
+        <div class="chips">
+          <button class="general selected"><img src="assets/icons/user.svg" alt="General">General</button>
+          <button class="family"><img src="assets/icons/family.svg" alt="Family">Family</button>
+          <button class="senior"><img src="assets/icons/elderly.svg" alt="Senior">Senior</button>
+          <button class="extreme-heat"><img src="assets/icons/tempHigh.svg" alt="Extreme Heat">Extreme Heat</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Cooling Nearby</h2>
+        <div class="legend" aria-label="What to look for">
+          <div class="legend-items">
+            <div class="legend-item" style="--legend-color: #76c6ff;">
+              <span class="legend-icon"><img src="assets/icons/tempLow.svg" alt="" /></span>
+              <span>Community centres and libraries</span>
+            </div>
+            <div class="legend-item" style="--legend-color: #1366ff;">
+              <span class="legend-icon"><img src="assets/icons/waterRefill.svg" alt="" /></span>
+              <span>Drinking fountains</span>
+            </div>
+            <div class="legend-item" style="--legend-color: #7c5bd6;">
+              <span class="legend-icon"><img src="assets/icons/restroom.svg" alt="" /></span>
+              <span>Public washrooms</span>
+            </div>
+            <div class="legend-item" style="--legend-color: #ec8f2a;">
+              <span class="legend-icon"><img src="assets/icons/chair.svg" alt="" /></span>
+              <span>Benches and places to sit</span>
+            </div>
+            <div class="legend-item" style="--legend-color: #76afff;">
+              <span class="legend-icon"><img src="assets/icons/bus.svg" alt="" /></span>
+              <span>Transit stops</span>
+            </div>
+            <div class="legend-item" style="--legend-color: #1f5a9d;">
+              <span class="legend-icon"><img src="assets/icons/subway.svg" alt="" /></span>
+              <span>SkyTrain or rapid transit station</span>
+            </div>
+            <div class="legend-item" style="--legend-color: #2fbf71;">
+              <span class="legend-icon"><img src="assets/icons/thumbsUp.svg" alt="" /></span>
+              <span>Resident recommended place</span>
+            </div>
+            <div class="legend-item" style="--legend-color: #f54b20;">
+              <span class="legend-icon"><img src="assets/icons/tempHigh.svg" alt="" /></span>
+              <span>Resident identified hot spot</span>
+            </div>
+            <div class="legend-item" style="--legend-color: #ffd900;">
+              <span class="legend-icon"><img src="assets/icons/suggestion.svg" alt="" /></span>
+              <span>Resident suggestion or need</span>
+            </div>
+            <div class="legend-item" style="--legend-color: #178f4c;">
+              <span class="legend-route" aria-hidden="true"></span>
+              <span>Possible shady walking route</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </aside>
     """
 
-    script = """
-    <script>
-      document.addEventListener("DOMContentLoaded", function () {
-        const buttons = document.querySelectorAll(".mode-buttons button");
-        const scenarioButtons = document.querySelectorAll(".scenario-buttons button");
-        const help = document.getElementById("mode-help");
-        const scenarioHelp = document.getElementById("scenario-help");
-        const helpText = {
-          standard: "Standard mode shows all controls and regular text size.",
-          senior: "Large text mode increases labels, popups, and map markers.",
-          colorblind: "High contrast mode uses stronger borders, words, and a colorblind-friendly palette.",
-          simple: "Simple view hides technical notes and extra layer controls for a calmer public display."
-        };
-        const scenarioText = {
-          all: "All mode shows all mapped resources.",
-          senior: "Senior mode highlights places to sit, washrooms, water, and civic cooling places.",
-          family: "Family mode highlights water, washrooms, civic buildings, parks, and child-friendly rest options.",
-          heat: "Extreme heat mode highlights cooling places, water, washrooms, and transit.",
-          resident: "Resident input mode highlights questionnaire and workshop feedback."
-        };
-
-        function setMode(mode) {
-          document.body.classList.remove("access-senior", "access-colorblind", "access-simple");
-          if (mode === "senior") document.body.classList.add("access-senior");
-          if (mode === "colorblind") document.body.classList.add("access-colorblind");
-          if (mode === "simple") document.body.classList.add("access-simple");
-          buttons.forEach((button) => {
-            button.classList.toggle("active", button.dataset.mode === mode);
-            button.setAttribute("aria-pressed", button.dataset.mode === mode ? "true" : "false");
-          });
-          if (help) help.textContent = helpText[mode] || helpText.standard;
-          localStorage.setItem("coolingMapMode", mode);
-        }
-
-        function setScenario(scenario) {
-          document.body.classList.remove("scenario-senior", "scenario-family", "scenario-heat", "scenario-resident");
-          if (scenario !== "all") document.body.classList.add("scenario-" + scenario);
-          scenarioButtons.forEach((button) => {
-            button.classList.toggle("active", button.dataset.scenario === scenario);
-            button.setAttribute("aria-pressed", button.dataset.scenario === scenario ? "true" : "false");
-          });
-          if (scenarioHelp) scenarioHelp.textContent = scenarioText[scenario] || scenarioText.all;
-          localStorage.setItem("coolingMapScenario", scenario);
-        }
-
-        buttons.forEach((button) => {
-          button.addEventListener("click", function () {
-            setMode(button.dataset.mode);
-          });
-        });
-        scenarioButtons.forEach((button) => {
-          button.addEventListener("click", function () {
-            setScenario(button.dataset.scenario);
-          });
-        });
-        setMode(localStorage.getItem("coolingMapMode") || "standard");
-        setScenario(localStorage.getItem("coolingMapScenario") || "all");
-      });
-    </script>
-    """
+    
 
     fmap.get_root().header.add_child(folium.Element(css))
     fmap.get_root().header.add_child(folium.Element(f"<title>{PUBLIC_MAP_TITLE}</title>"))

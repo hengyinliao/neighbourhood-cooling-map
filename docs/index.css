@@ -81,7 +81,7 @@ input {
     min-width: 380px;
     height: 100%;
     padding: 1.5rem;
-    overflow-y: auto;
+    overflow-y: visible;
     box-shadow: 0 0 18px rgba(20, 40, 70, 0.12);
     z-index: 1000;
     border-radius: 0 1rem 1rem 0;
@@ -184,6 +184,32 @@ p {
     grid-template-columns: repeat(5, 1fr);
 }
 
+.toggle-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.toggle-bar span {
+    cursor: pointer;
+    display: inline-block;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #00000056;
+    transform: rotate(0deg);
+    transition: transform 0.3s ease;
+}
+
+.toggle-bar span[aria-expanded="true"] {
+    transform: rotate(180deg);
+}
+
+.toggle-bar span:focus-visible {
+    outline: 3px solid #1063c7;
+    outline-offset: 3px;
+    border-radius: 4px;
+}
+
 .chips button,
 .actions button,
 .route-options button {
@@ -278,7 +304,6 @@ button.extreme-heat.selected img {
 }
 
 /* hide the default leaflet search control */
-
 .leaflet-control-layers {
     display: none;
 }
@@ -288,8 +313,18 @@ button.extreme-heat.selected img {
     border: 0;
     padding-bottom: 4px;
     font-size: 12px;
-    max-width: 100%;
-    overflow-x: auto;
+    overflow-x: scroll;
+    position: absolute;
+    width: calc(max(20vw, 380px) - 3rem);
+    max-width: calc(100vw - 2rem);
+    border-radius: 0;
+    transition: width 0.3s ease, border-radius 0.3s ease;
+}
+
+.legend[aria-expanded="true"] {
+    width: min(900px, calc(100vw - 2rem));
+    border-radius: 1rem;
+    overflow-x: hidden;
 }
 
 .legend-items {
@@ -408,6 +443,7 @@ button.extreme-heat.selected img {
     }
 
     .left-panel {
+        overflow-y: scroll;
         position: fixed;
         bottom: 1rem;
         left: 1rem;
@@ -430,6 +466,10 @@ button.extreme-heat.selected img {
     .weather-widget__range {
         display: none !important;
     }
+
+    .legend-toggle {
+        display: none;
+    }
 }
 
 @media (max-width: 760px) {
@@ -439,6 +479,7 @@ button.extreme-heat.selected img {
 
     .left-panel {
         position: fixed;
+        overflow-y: scroll;
         bottom: 0;
         left: 0;
         width: 100vw;
@@ -462,6 +503,10 @@ button.extreme-heat.selected img {
 
     .weather-widget__range {
         display: none !important;
+    }
+
+    .legend-toggle {
+        display: none;
     }
 }
 

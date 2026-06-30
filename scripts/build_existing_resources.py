@@ -695,8 +695,8 @@ def add_public_accessibility_controls(fmap: folium.Map) -> None:
       </section>
 
       <section>
-        <h2>Cooling Nearby</h2>
-        <div class="legend" aria-label="What to look for">
+        <h2 class="toggle-bar">Cooling Nearby<span class="legend-toggle" role="button" tabindex="0" aria-controls="cooling-nearby-legend" aria-expanded="false" aria-label="Expand cooling nearby legend">&gt;</span></h2>
+        <div class="legend" id="cooling-nearby-legend" aria-label="Cooling nearby legend" aria-expanded="false">
           <div class="legend-items">
             <button class="legend-item" type="button" data-layer="Community centres and libraries" style="--legend-color: #76c6ff;">
               <span class="legend-icon"><img src="assets/icons/tempLow.svg" alt="" /></span>

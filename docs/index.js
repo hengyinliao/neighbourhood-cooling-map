@@ -23,9 +23,96 @@ document.addEventListener("DOMContentLoaded", function () {
         senior: "senior",
         "extreme-heat": "heat"
     };
+    const mapContextLayers = [
+        "Nearby area, within about 500 m",
+        "Main project area"
+    ];
+    const scenarioLayerPresets = {
+        all: "all",
+        senior: [
+            "Community centres and libraries",
+            "Water fountains",
+            "Public washrooms",
+            "Benches and places to sit",
+            "Parks and green spaces",
+            "Possible shady walking routes"
+        ],
+        family: [
+            "Community centres and libraries",
+            "Parks and green spaces",
+            "Water fountains",
+            "Public washrooms",
+            "Resident feedback and workshop notes",
+             "Possible shady walking routes"
+        ],
+        heat: [
+            "Possible shady walking routes",
+            "Community centres and libraries",
+            "Water fountains",
+            "Public washrooms",
+            "Bus and transit stops",
+            "Train and rapid transit stations"
+        ],
+        resident: [
+            "Resident feedback and workshop notes"
+        ]
+    };
+
+    const normalize = (value) => (value || "").replace(/\s+/g, " ").trim();
 
     function getScenarioFromButton(button) {
         return Object.entries(scenarioByButtonClass).find(([className]) => button.classList.contains(className))?.[1] || "all";
+    }
+
+    function getLayerInputMap() {
+        const inputByLayer = new Map();
+        const layerLabels = Array.from(document.querySelectorAll(".leaflet-control-layers-overlays label"));
+
+        layerLabels.forEach((label) => {
+            const input = label.querySelector("input.leaflet-control-layers-selector");
+            if (!input) return;
+
+            const labelClone = label.cloneNode(true);
+            labelClone.querySelectorAll("input").forEach((inputNode) => inputNode.remove());
+            inputByLayer.set(normalize(labelClone.textContent), input);
+        });
+
+        return inputByLayer;
+    }
+
+    function syncLegendState(inputByLayer = getLayerInputMap()) {
+        const legendButtons = Array.from(document.querySelectorAll(".legend-item[data-layer]"));
+
+        legendButtons.forEach((button) => {
+            const input = inputByLayer.get(normalize(button.dataset.layer));
+            if (!input) return;
+
+            button.classList.toggle("is-off", !input.checked);
+            button.setAttribute("aria-pressed", input.checked ? "true" : "false");
+        });
+    }
+
+    function applyScenarioLayerPreset(scenario, attempt = 0) {
+        const inputByLayer = getLayerInputMap();
+        if (!inputByLayer.size) {
+            if (attempt < 60) {
+                window.setTimeout(() => applyScenarioLayerPreset(scenario, attempt + 1), 50);
+            }
+            return;
+        }
+
+        const preset = scenarioLayerPresets[scenario] || scenarioLayerPresets.all;
+        const desiredLayers = preset === "all"
+            ? null
+            : new Set([...mapContextLayers, ...preset].map(normalize));
+
+        inputByLayer.forEach((input, layerName) => {
+            const shouldBeChecked = desiredLayers === null || desiredLayers.has(layerName);
+            if (input.checked !== shouldBeChecked) {
+                input.click();
+            }
+        });
+        syncLegendState(inputByLayer);
     }
 
     function setMode(mode) {
@@ -54,43 +141,45 @@ document.addEventListener("DOMContentLoaded", function () {
         });
         if (scenarioHelp) scenarioHelp.textContent = scenarioText[activeScenario] || scenarioText.all;
         localStorage.setItem("coolingMapScenario", activeScenario);
+        applyScenarioLayerPreset(activeScenario);
+    }
+
+    function setupLegendExpansionToggle() {
+        document.querySelectorAll(".legend-toggle").forEach((toggle) => {
+            const legend = toggle.closest("section")?.querySelector(".legend");
+            if (!legend) return;
+
+            const setExpanded = (isExpanded) => {
+                legend.setAttribute("aria-expanded", isExpanded ? "true" : "false");
+                legend.classList.toggle("extended", isExpanded);
+                toggle.setAttribute("aria-expanded", isExpanded ? "true" : "false");
+                toggle.setAttribute("aria-label", `${isExpanded ? "Collapse" : "Expand"} cooling nearby legend`);
+            };
+
+            toggle.addEventListener("click", () => {
+                setExpanded(legend.getAttribute("aria-expanded") !== "true");
+            });
+            toggle.addEventListener("keydown", (event) => {
+                if (event.key !== "Enter" && event.key !== " ") return;
+
+                event.preventDefault();
+                setExpanded(legend.getAttribute("aria-expanded") !== "true");
+            });
+        });
     }
 
     function setupLegendLayerBridge(attempt = 0) {
         const legendButtons = Array.from(document.querySelectorAll(".legend-item[data-layer]"));
         if (!legendButtons.length) return;
 
-        const normalize = (value) => (value || "").replace(/\s+/g, " ").trim();
-        const layerLabels = Array.from(document.querySelectorAll(".leaflet-control-layers-overlays label"));
+        const inputByLayer = getLayerInputMap();
 
-        if (!layerLabels.length) {
+        if (!inputByLayer.size) {
             if (attempt < 60) {
                 window.setTimeout(() => setupLegendLayerBridge(attempt + 1), 50);
             }
             return;
         }
-
-        const inputByLayer = new Map();
-        layerLabels.forEach((label) => {
-            const input = label.querySelector("input.leaflet-control-layers-selector");
-            if (!input) return;
-
-            const labelClone = label.cloneNode(true);
-            labelClone.querySelectorAll("input").forEach((inputNode) => inputNode.remove());
-            inputByLayer.set(normalize(labelClone.textContent), input);
-        });
-
-        const setLegendState = (layerName) => {
-            const input = inputByLayer.get(layerName);
-            if (!input) return;
-
-            legendButtons
-                .filter((button) => normalize(button.dataset.layer) === layerName)
-                .forEach((button) => {
-                    button.classList.toggle("is-off", !input.checked);
-                    button.setAttribute("aria-pressed", input.checked ? "true" : "false");
-                });
-        };
 
         legendButtons.forEach((button) => {
             const layerName = normalize(button.dataset.layer);
@@ -103,15 +192,15 @@ document.addEventListener("DOMContentLoaded", function () {
             }
 
             button.setAttribute("aria-label", `Toggle ${normalize(button.textContent)}`);
-            setLegendState(layerName);
             button.addEventListener("click", () => {
                 input.click();
-                setLegendState(layerName);
+                syncLegendState(inputByLayer);
             });
         });
+        syncLegendState(inputByLayer);
 
-        inputByLayer.forEach((input, layerName) => {
-            input.addEventListener("change", () => setLegendState(layerName));
+        inputByLayer.forEach((input) => {
+            input.addEventListener("change", () => syncLegendState(inputByLayer));
         });
     }
 
@@ -199,6 +288,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
     setMode(localStorage.getItem("coolingMapMode") || "standard");
     setScenario(localStorage.getItem("coolingMapScenario") || "all");
+    setupLegendExpansionToggle();
     setupLegendLayerBridge();
     setupPanelSearchBridge();
 

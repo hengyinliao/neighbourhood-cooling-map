@@ -343,7 +343,8 @@ document.addEventListener("DOMContentLoaded", function () {
             }
 
             if (isEvening) {
-              return `radial-gradient(circle at 80% 22%, ${heatGlow}, transparent 36%), linear-gradient(145deg, #734d9f, #e07155 56%, #f7b660)`;
+              return `radial-gradient(circle at 83% 42%, ${heatGlow}, transparent 36%), linear-gradient(156deg, #7ca2ff, #ff9479 56%, #f7b660)`;
+              
             }
 
             return `radial-gradient(circle at 28% 18%, ${heatGlow}, transparent 36%), linear-gradient(145deg, #117bc1, #55bfe0 75%, #b7ebff)`;

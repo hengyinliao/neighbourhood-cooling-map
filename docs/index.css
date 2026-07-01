@@ -467,7 +467,7 @@ button.extreme-heat.selected img {
         display: none !important;
     }
 
-    .legend-toggle {
+    .toggle-bar span {
         display: none;
     }
 }
@@ -505,7 +505,7 @@ button.extreme-heat.selected img {
         display: none !important;
     }
 
-    .legend-toggle {
+    .toggle-bar span {
         display: none;
     }
 }

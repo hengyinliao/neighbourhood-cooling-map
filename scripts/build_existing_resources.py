@@ -10,10 +10,10 @@ New work should usually run these steps separately:
 from __future__ import annotations
 
 try:
-    from .build_page import main as build_page_main
+    from .build_page_data import main as build_page_main
     from .fetch_features import main as fetch_features_main
 except ImportError:  # pragma: no cover - used when run as a plain script
-    from build_page import main as build_page_main
+    from scripts.build_page_data import main as build_page_main
     from fetch_features import main as fetch_features_main
 
 

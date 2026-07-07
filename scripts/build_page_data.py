@@ -36,7 +36,7 @@ RESOURCE_LAYERS = [
     "civic_cooling_places",
     "drinking_fountains",
     "public_washrooms",
-    "public_trees",
+    # "public_trees", # No need to show all trees since we only need the shade metrics, which are already in the shaded_walking_routes layer
     "rapid_transit_stations",
     "resident_input",
     "benches_osm",

@@ -14,10 +14,11 @@ This step:
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import re
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable, Mapping
 
 import geopandas as gpd
 import pandas as pd
@@ -34,6 +35,8 @@ DATA_DIR = ROOT / "data"
 RAW_DIR = ROOT / "data" / "raw"
 OUTPUT_DIR = ROOT / "outputs"
 GEOJSON_DIR = OUTPUT_DIR / "geojson"
+CONFIG_DIR = ROOT / "config"
+LAYER_PROPERTIES_PATH = CONFIG_DIR / "layer_properties.toml"
 RESIDENT_INPUT_CSV = DATA_DIR / "resident_input_template.csv"
 MAP_CONFIG_PATH = GEOJSON_DIR / "map_config.json"
 
@@ -57,6 +60,19 @@ CITY_DATASETS = {
     "public_washrooms": "public-washrooms",
     "public_trees": "public-trees",
     "rapid_transit_stations": "rapid-transit-stations",
+}
+
+TEMPLATE_PATTERN = re.compile(r"{{(.*?)}}", re.DOTALL)
+SAFE_TEMPLATE_GLOBALS = {
+    "__builtins__": {},
+    "bool": bool,
+    "float": float,
+    "int": int,
+    "len": len,
+    "max": max,
+    "min": min,
+    "round": round,
+    "str": str,
 }
 
 
@@ -156,6 +172,120 @@ def json_safe_value(value):
     return value
 
 
+def missing_to_none(value):
+    if isinstance(value, (list, tuple, set, dict)):
+        return value
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+    return value
+
+
+class PropertyContext(dict):
+    """Allow template expressions to use either name or properties.name."""
+
+    def __missing__(self, key):
+        return None
+
+    def __getattr__(self, key):
+        try:
+            return self[key]
+        except KeyError:
+            return None
+
+
+def load_layer_properties_config(path: Path = LAYER_PROPERTIES_PATH) -> dict[str, dict[str, Any]]:
+    """Load per-layer output property mappings from TOML."""
+    if not path.exists():
+        return {}
+
+    try:
+        import tomllib
+    except ModuleNotFoundError:  # pragma: no cover - used by Python < 3.11
+        try:
+            import tomli as tomllib
+        except ModuleNotFoundError:
+            return parse_simple_layer_properties_config(path)
+
+    with path.open("rb") as config_file:
+        config = tomllib.load(config_file)
+
+    layers = config.get("layers", {})
+    if not isinstance(layers, dict):
+        raise ValueError(f"{path} must contain a [layers] table.")
+
+    return {str(layer): dict(mapping) for layer, mapping in layers.items()}
+
+
+def parse_simple_layer_properties_config(path: Path) -> dict[str, dict[str, Any]]:
+    """Parse the simple [layers.<name>] TOML shape without an external dependency."""
+    layers: dict[str, dict[str, Any]] = {}
+    current_layer: str | None = None
+    for line_number, raw_line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            section = line[1:-1].strip()
+            current_layer = section.removeprefix("layers.") if section.startswith("layers.") else None
+            if current_layer:
+                layers.setdefault(current_layer, {})
+            continue
+        if current_layer is None:
+            continue
+        if "=" not in line:
+            raise ValueError(f"Invalid TOML assignment in {path} at line {line_number}: {raw_line!r}")
+
+        key, value = (part.strip() for part in line.split("=", 1))
+        try:
+            layers[current_layer][key] = ast.literal_eval(value)
+        except (SyntaxError, ValueError):
+            lower_value = value.lower()
+            if lower_value == "true":
+                layers[current_layer][key] = True
+            elif lower_value == "false":
+                layers[current_layer][key] = False
+            else:
+                raise ValueError(f"Unsupported TOML value in {path} at line {line_number}: {raw_line!r}")
+    return layers
+
+
+def row_properties(row: pd.Series, geometry_name: str) -> PropertyContext:
+    properties = {
+        key: missing_to_none(value)
+        for key, value in row.items()
+        if key != geometry_name
+    }
+    context = PropertyContext(properties)
+    context["properties"] = context
+    return context
+
+
+def evaluate_template_expression(expression: str, context: PropertyContext):
+    # TOML basic strings decode \n before Python sees the embedded expression.
+    expression = expression.replace("\n", "\\n")
+    return eval(expression, SAFE_TEMPLATE_GLOBALS, context)
+
+
+def render_property_template(template, context: PropertyContext):
+    if not isinstance(template, str):
+        return template
+
+    full_expression = TEMPLATE_PATTERN.fullmatch(template.strip())
+    if full_expression:
+        return json_safe_value(evaluate_template_expression(full_expression.group(1).strip(), context))
+
+    def replace_expression(match: re.Match) -> str:
+        value = evaluate_template_expression(match.group(1).strip(), context)
+        if value is None:
+            return ""
+        return str(json_safe_value(value))
+
+    return TEMPLATE_PATTERN.sub(replace_expression, template)
+
+
 def make_properties_json_safe(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     """Convert list-like attribute values so Folium and GeoJSON exports stay simple."""
     if gdf.empty:
@@ -171,33 +301,27 @@ def make_properties_json_safe(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
 def standardize(
     gdf: gpd.GeoDataFrame,
     layer: str,
-    category: str,
-    source: str,
-    name_candidates: Iterable[str] = ("name", "mapid", "facility_name", "address"),
-    keep_columns: Iterable[str] = (),
+    property_map: Mapping[str, Any],
 ) -> gpd.GeoDataFrame:
-    """Create a small common schema while preserving selected source fields."""
+    """Render configured output properties for a layer."""
+    if not property_map:
+        raise ValueError(f"Missing layer property mapping for {layer}.")
+
     gdf = gdf.copy()
-    name_col = first_existing_column(gdf, name_candidates)
-    if name_col:
-        names = gdf[name_col].map(json_safe_value).fillna(category).astype(str)
-    else:
-        names = category
+    out = gpd.GeoDataFrame(index=gdf.index, geometry=gdf.geometry, crs=gdf.crs)
 
-    out = gpd.GeoDataFrame(
-        {
-            "name": names,
-            "category": category,
-            "layer": layer,
-            "source": source,
-        },
-        geometry=gdf.geometry,
-        crs=gdf.crs,
-    )
-
-    for col in keep_columns:
-        if col in gdf.columns:
-            out[col] = gdf[col]
+    for out_col, template in property_map.items():
+        values = []
+        for idx, row in gdf.iterrows():
+            context = row_properties(row, gdf.geometry.name)
+            try:
+                values.append(render_property_template(template, context))
+            except Exception as exc:
+                raise ValueError(
+                    f"Failed to evaluate layer_properties template for "
+                    f"{layer}.{out_col} at source row {idx}: {template!r}"
+                ) from exc
+        out[out_col] = pd.Series(values, index=gdf.index, dtype="object")
     return out
 
 
@@ -215,38 +339,33 @@ def combine_layers(layers: list[gpd.GeoDataFrame]) -> gpd.GeoDataFrame:
     ).to_crs(CRS_WGS84)
 
 
-def load_city_resources(buffered_area: gpd.GeoDataFrame, refresh: bool = False) -> dict[str, gpd.GeoDataFrame]:
-    city_source = "City of Vancouver Open Data"
+def load_city_resources(
+    buffered_area: gpd.GeoDataFrame,
+    refresh: bool = False,
+    layer_properties: Mapping[str, Mapping[str, Any]] | None = None,
+) -> dict[str, gpd.GeoDataFrame]:
+    layer_properties = layer_properties or {}
     layers: dict[str, gpd.GeoDataFrame] = {}
 
     parks = clip_to_area(read_city_layer("parks", refresh=refresh), buffered_area)
     layers["parks"] = standardize(
         parks,
         layer="parks",
-        category="Park or green space",
-        source=city_source,
-        name_candidates=("park_name", "name", "mapid"),
-        keep_columns=("park_name", "area_ha"),
+        property_map=layer_properties.get("parks", {}),
     )
 
     community_centres = clip_to_area(read_city_layer("community_centres", refresh=refresh), buffered_area)
     layers["community_centres"] = standardize(
         community_centres,
         layer="community_centres",
-        category="Community centre",
-        source=city_source,
-        name_candidates=("name", "address"),
-        keep_columns=("address", "url"),
+        property_map=layer_properties.get("community_centres", {}),
     )
 
     libraries = clip_to_area(read_city_layer("libraries", refresh=refresh), buffered_area)
     layers["libraries"] = standardize(
         libraries,
         layer="libraries",
-        category="Library",
-        source=city_source,
-        name_candidates=("name", "address"),
-        keep_columns=("address", "url"),
+        property_map=layer_properties.get("libraries", {}),
     )
 
     layers["civic_cooling_places"] = combine_layers(
@@ -260,40 +379,28 @@ def load_city_resources(buffered_area: gpd.GeoDataFrame, refresh: bool = False) 
     layers["drinking_fountains"] = standardize(
         fountains,
         layer="drinking_fountains",
-        category="Drinking fountain or bottle fill",
-        source=city_source,
-        name_candidates=("location", "name", "address"),
-        keep_columns=("location", "in_operation", "maintainer"),
+        property_map=layer_properties.get("drinking_fountains", {}),
     )
 
     washrooms = clip_to_area(read_city_layer("public_washrooms", refresh=refresh), buffered_area)
     layers["public_washrooms"] = standardize(
         washrooms,
         layer="public_washrooms",
-        category="Public washroom",
-        source=city_source,
-        name_candidates=("name", "location", "address"),
-        keep_columns=("location", "summer_hours", "winter_hours", "wheelchair_accessible"),
+        property_map=layer_properties.get("public_washrooms", {}),
     )
 
     trees = clip_to_area(read_city_layer("public_trees", refresh=refresh), buffered_area)
     layers["public_trees"] = standardize(
         trees,
         layer="public_trees",
-        category="Public tree",
-        source=city_source,
-        name_candidates=("common_name", "species_name", "genus_name"),
-        keep_columns=("common_name", "diameter", "on_street", "neighbourhood_name"),
+        property_map=layer_properties.get("public_trees", {}),
     )
 
     rapid = clip_to_area(read_city_layer("rapid_transit_stations", refresh=refresh), buffered_area)
     layers["rapid_transit_stations"] = standardize(
         rapid,
         layer="rapid_transit_stations",
-        category="Rapid transit station",
-        source=city_source,
-        name_candidates=("station", "name"),
-        keep_columns=("line",),
+        property_map=layer_properties.get("rapid_transit_stations", {}),
     )
 
     return layers
@@ -365,13 +472,15 @@ def osm_features(
     boundary: gpd.GeoDataFrame,
     tags: dict,
     layer: str,
-    category: str,
     cache_slug: str,
     refresh: bool = False,
+    layer_properties: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> gpd.GeoDataFrame:
+    property_map = (layer_properties or {}).get(layer, {})
     cache_path = RAW_DIR / f"{layer}_{cache_slug}.geojson"
     if cache_path.exists() and not refresh:
-        return gpd.read_file(cache_path).to_crs(CRS_WGS84)
+        cached = gpd.read_file(cache_path).to_crs(CRS_WGS84)
+        return standardize(cached, layer=layer, property_map=property_map)
 
     if ox is None:
         print(f"Skipping {layer}: osmnx is not installed.")
@@ -395,10 +504,7 @@ def osm_features(
     out = standardize(
         gdf,
         layer=layer,
-        category=category,
-        source="OpenStreetMap",
-        name_candidates=("name", "ref", "operator"),
-        keep_columns=("amenity", "highway", "public_transport", "operator", "network"),
+        property_map=property_map,
     )
     out.to_file(cache_path, driver="GeoJSON")
     return out
@@ -517,6 +623,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Re-download cached City and OSM source data.",
     )
+    parser.add_argument(
+        "--layer-properties",
+        type=Path,
+        default=LAYER_PROPERTIES_PATH,
+        help=f"Layer property mapping TOML. Default: {LAYER_PROPERTIES_PATH.relative_to(ROOT)}.",
+    )
     return parser.parse_args(argv)
 
 
@@ -525,21 +637,22 @@ def main(argv: list[str] | None = None) -> None:
     local_areas = args.local_areas or DEFAULT_LOCAL_AREAS
     buffer_metres = args.buffer_metres
     cache_slug = region_slug(local_areas, buffer_metres)
+    layer_properties = load_layer_properties_config(args.layer_properties)
 
     ensure_dirs()
     project_area, buffered_area = build_project_area(local_areas, buffer_metres, refresh=args.refresh)
     export_geojson(project_area, "project_area")
     export_geojson(buffered_area, "project_area_buffer")
 
-    layers = load_city_resources(buffered_area, refresh=args.refresh)
+    layers = load_city_resources(buffered_area, refresh=args.refresh, layer_properties=layer_properties)
     layers["resident_input"] = load_resident_input(buffered_area)
     layers["benches_osm"] = osm_features(
         buffered_area,
         tags={"amenity": "bench"},
         layer="benches_osm",
-        category="Bench or place to sit",
         cache_slug=cache_slug,
         refresh=args.refresh,
+        layer_properties=layer_properties,
     )
     layers["transit_stops_osm"] = osm_features(
         buffered_area,
@@ -549,9 +662,9 @@ def main(argv: list[str] | None = None) -> None:
             "railway": "tram_stop",
         },
         layer="transit_stops_osm",
-        category="Transit stop",
         cache_slug=cache_slug,
         refresh=args.refresh,
+        layer_properties=layer_properties,
     )
     layers["shaded_walking_routes"] = build_shaded_routes(
         buffered_area,

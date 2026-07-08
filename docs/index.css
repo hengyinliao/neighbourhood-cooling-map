@@ -80,14 +80,14 @@ input {
 }
 
 .leaflet-marker-icon.cooling-div-icon.is-selected {
-    z-index: 1200 !important;
+    z-index: 2200 !important;
 }
 
 .cooling-div-icon.is-selected .cooling-map-marker {
     border-color: #ffffff;
     box-shadow: 0 22px 34px rgba(20, 40, 70, 0.28);
     transform: scale(1.28) translateY(-1rem);
-    z-index: 1200;
+    z-index: 2200;
 }
 
 .leaflet-interactive {
@@ -699,8 +699,26 @@ button.extreme-heat.selected img {
     outline: 0;
 }
 
+.resource-toast .smaller {
+    display: inline-block;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+.resource-toast a {
+    color: #5e5e5e;
+    text-decoration: dotted underline;
+}
+
+.resource-toast .smaller.blue {
+    color: #1386af;
+}
+
+.resource-toast .green {
+    color: #2fbf71;
+}
+
 .popup-title {
-    margin-bottom: 6px;
     color: #1f2a44;
     font-weight: 800;
 }
@@ -708,7 +726,8 @@ button.extreme-heat.selected img {
 .popup-source {
     margin-top: 8px;
     color: #6d7890;
-    font-size: 12px;
+    font-size: 0.8rem;
+    text-align: center;
 }
 
 @media (max-width: 760px) {

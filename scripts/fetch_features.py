@@ -563,8 +563,8 @@ def build_shaded_routes(
             return "Moderate shade potential"
         return "Lower shade potential"
 
-    edges["category"] = edges["trees_per_100m"].apply(shade_class)
-    edges = edges[edges["category"] != "Lower shade potential"].copy()
+    edges["shade_potential"] = edges["trees_per_100m"].apply(shade_class)
+    edges = edges[edges["shade_potential"] != "Lower shade potential"].copy()
     if edges.empty:
         return empty_resource_gdf()
 
@@ -573,7 +573,7 @@ def build_shaded_routes(
     out = gpd.GeoDataFrame(
         {
             "name": names,
-            "category": edges["category"],
+            "shade_potential": edges["shade_potential"],
             "layer": "shaded_walking_routes",
             "source": "OpenStreetMap walking network + City public trees",
             "length_m": edges["length_m"].round(1),

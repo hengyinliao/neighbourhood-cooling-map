@@ -183,19 +183,35 @@ document.addEventListener("DOMContentLoaded", function () {
         return String(value);
     }
 
+    function buildKeyValueHtml(key, value) {
+        if (["name", "latitude", "longitude", "source", "id", "navigation", "edit"].includes(key)) return "";
+        if (key === "type") return `<span class="smaller blue">${escapeHtml(propertyValueText(value))}</span>`;
+        if (key === "location") return `<div>Located at ${escapeHtml(propertyValueText(value)).replace(/\bat\b/gi, "")}</div>`;
+        if (key === "address") return `<div>Address: ${escapeHtml(propertyValueText(value))}</div>`;
+        if (key === "trees_per_100m") return `<div><b>${escapeHtml(propertyValueText(value))}</b> trees per 100m</div>`;
+        if (key === "shade_potential") return `<div class="green">${escapeHtml(propertyValueText(value))}</div>`;
+        if (key === "hours") return `<div><b>Opening Hours:</b> ${escapeHtml(propertyValueText(value))}</div>`;
+        if (key === "operating_period") return value === "unknown" ? "" : `<div><b>Operating Period:</b> ${escapeHtml(propertyValueText(value))}</div>`;
+        if (key === "pet_friendly") return value ? `<div class="green">Pet friendly</div>` : "";
+        if (key === "wheelchair_accessible") return value ? `<div class="green">Wheelchair accessible</div>` : "";
+        if (key === "website") return `<div><a href="${escapeHtml(value)}" target="_blank" rel="noopener noreferrer">Website &nearr;</a></div>`;
+
+        return `<div><b>${escapeHtml(key)}:</b> ${escapeHtml(propertyValueText(value))}</div>`;
+    }
+
+
     function resourceDetailsHtml(properties, style = {}) {
         const title = escapeHtml(properties.name || style.popupType || "Map feature");
         const propertyHtml = Object.entries(properties)
             .filter(([, value]) => value !== null && value !== undefined && value !== "")
-            .map(([key, value]) => `
-                <div><b>${escapeHtml(key)}:</b> ${escapeHtml(propertyValueText(value))}</div>
-            `)
+            .map(([key, value]) => buildKeyValueHtml(key, value))
             .join("");
 
         return `
             <div class="resource-popup">
               <div class="popup-title">${title}</div>
               ${propertyHtml || "<div>No properties available.</div>"}
+              <div class="popup-source">${properties.source ? `<i>${escapeHtml(properties.source)}</i> ` : ""} ${properties.id ? `${escapeHtml(properties.id)}` : ""}</div>
             </div>
         `;
     }
@@ -259,7 +275,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const anchorX = mapRect.left + markerPoint.x;
         const anchorY = mapRect.top + markerPoint.y;
         const toastRect = resourceToast.getBoundingClientRect();
-        const gap = 58;
+        const gap = 48;
         const edgeGap = 16;
         const panel = document.querySelector(".panel");
         const panelRect = panel?.getBoundingClientRect();
@@ -410,26 +426,49 @@ document.addEventListener("DOMContentLoaded", function () {
         registerLayer("Parks and green spaces", layer);
     }
 
+    function treeDensityColor(treesPer100m, minTreesPer100m, maxTreesPer100m) {
+        const value = Number(treesPer100m);
+        if (!Number.isFinite(value) || !Number.isFinite(minTreesPer100m) || !Number.isFinite(maxTreesPer100m)) {
+            return "#58bd60";
+        }
+
+        const range = maxTreesPer100m - minTreesPer100m;
+        if (range <= 0) {
+            return "#0f5828";
+        }
+
+        const ratio = Math.min(1, Math.max(0, (value - minTreesPer100m) / range));
+        const hue = Math.round(35 + ratio * 110);
+        return `hsl(${hue}, 82%, 36%)`;
+    }
+
     function addShadedRouteLayer() {
         const routes = data.layers?.shaded_walking_routes;
         if (!hasFeatures(routes)) return;
 
+        const treeDensityValues = routes.features
+            .map((feature) => Number(feature.properties?.trees_per_100m))
+            .filter(Number.isFinite);
+        const minTreesPer100m = 2;
+        const maxTreesPer100m = 20;
+
         const layer = L.geoJSON(routes, {
             style(feature) {
-                const category = feature.properties?.category;
+                const shade_potential = feature.properties?.shade_potential;
+                const trees_per_100m = feature.properties?.trees_per_100m;
                 return {
-                    color: category === "Higher shade potential" ? "#005a32" : "#5aae61",
-                    weight: category === "Higher shade potential" ? 5 : 3,
+                    color: treeDensityColor(trees_per_100m, minTreesPer100m, maxTreesPer100m),
+                    weight: shade_potential === "Higher shade potential" ? 4 : 2,
                     opacity: 0.9,
-                    dashArray: category === "Higher shade potential" ? null : "7, 5"
+                    dashArray: shade_potential === "Higher shade potential" ? null : "7, 5"
                 };
             },
             onEachFeature(feature, featureLayer) {
                 const properties = feature.properties || {};
-                const trees = properties.trees_per_100m ? `${properties.trees_per_100m} public trees per 100 m` : "";
+                const trees = properties.trees_per_100m ? `${properties.trees_per_100m} trees per 100 m` : "";
                 featureLayer.bindTooltip(`
                     <strong>${escapeHtml(properties.name || "Walking route segment")}</strong><br>
-                    ${escapeHtml(properties.category || "Shade estimate")}<br>
+                    ${escapeHtml(properties.shade_potential || "Shade estimate")}<br>
                     ${escapeHtml(trees)}
                 `);
                 featureLayer.on("click", (event) => {

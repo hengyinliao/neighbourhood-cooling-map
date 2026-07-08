@@ -119,6 +119,10 @@ document.addEventListener("DOMContentLoaded", function () {
     resourceToast.setAttribute("aria-label", "Selected map feature");
     document.body.appendChild(resourceToast);
     let selectedFeatureLayer = null;
+    let selectedFeatureAnchorLatLng = null;
+    const desktopToastQuery = window.matchMedia("(min-width: 761px)");
+    const mobileCenterQuery = window.matchMedia("(max-width: 760px)");
+    const mobileCenterOffsetPercent = data.config?.mobile_center_offset_percent || { x: 0, y: -18 };
 
     const map = L.map("map", {
         center: data.config?.center || [49.2528, -123.1049],
@@ -196,6 +200,89 @@ document.addEventListener("DOMContentLoaded", function () {
         `;
     }
 
+    function mobileOffsetPixels(offsetPercent) {
+        let offset = offsetPercent || {};
+        if (typeof offsetPercent === "number" || typeof offsetPercent === "string") {
+            offset = { x: 0, y: offsetPercent };
+        }
+        if (Array.isArray(offsetPercent)) {
+            offset = { x: offsetPercent[0], y: offsetPercent[1] };
+        }
+        const size = map.getSize();
+        return L.point(
+            size.x * (Number(offset.x || 0) / 100),
+            size.y * (Number(offset.y || 0) / 100)
+        );
+    }
+
+    function centerLatLngWithScreenOffset(targetLatLng, offsetPercent) {
+        if (!mobileCenterQuery.matches) return targetLatLng;
+
+        const targetPoint = map.project(targetLatLng, map.getZoom());
+        const offset = mobileOffsetPixels(offsetPercent);
+        return map.unproject(targetPoint.subtract(offset), map.getZoom());
+    }
+
+    function centerFeature(featureLayer, latlng, offsetPercent = mobileCenterOffsetPercent) {
+        const targetLatLng = latLngForFeature(featureLayer, latlng);
+        if (!targetLatLng) return;
+
+        map.panTo(centerLatLngWithScreenOffset(targetLatLng, offsetPercent), { animate: true });
+    }
+
+    function latLngForFeature(featureLayer, latlng = null) {
+        if (latlng) return latlng;
+        if (featureLayer?.getLatLng) return featureLayer.getLatLng();
+        if (featureLayer?.getBounds) {
+            const bounds = featureLayer.getBounds();
+            if (bounds.isValid()) return bounds.getCenter();
+        }
+        return null;
+    }
+
+    function clearResourceToastPosition() {
+        resourceToast.classList.remove("is-anchored", "is-left", "is-right");
+        resourceToast.style.removeProperty("top");
+        resourceToast.style.removeProperty("right");
+        resourceToast.style.removeProperty("bottom");
+        resourceToast.style.removeProperty("left");
+    }
+
+    function positionResourceToast() {
+        if (resourceToast.hidden || !desktopToastQuery.matches || !selectedFeatureAnchorLatLng) {
+            clearResourceToastPosition();
+            return;
+        }
+
+        const mapRect = map.getContainer().getBoundingClientRect();
+        const markerPoint = map.latLngToContainerPoint(selectedFeatureAnchorLatLng);
+        const anchorX = mapRect.left + markerPoint.x;
+        const anchorY = mapRect.top + markerPoint.y;
+        const toastRect = resourceToast.getBoundingClientRect();
+        const gap = 58;
+        const edgeGap = 16;
+        const panel = document.querySelector(".panel");
+        const panelRect = panel?.getBoundingClientRect();
+        const minLeft = panelRect && panelRect.right > 0 ? panelRect.right + edgeGap : edgeGap;
+        const maxLeft = Math.max(minLeft, window.innerWidth - toastRect.width - edgeGap);
+        const maxTop = Math.max(edgeGap, window.innerHeight - toastRect.height - edgeGap);
+        const rightDockLeft = anchorX + gap;
+        const leftDockLeft = anchorX - toastRect.width - gap;
+        const hasRoomRight = rightDockLeft <= maxLeft;
+        const hasRoomLeft = leftDockLeft >= minLeft;
+        const dockLeft = hasRoomRight || !hasRoomLeft ? rightDockLeft : leftDockLeft;
+        const placement = hasRoomRight || !hasRoomLeft ? "right" : "left";
+        const dockTop = Math.max(edgeGap, Math.min(anchorY - toastRect.height / 2, maxTop));
+
+        resourceToast.classList.add("is-anchored");
+        resourceToast.classList.toggle("is-right", placement === "right");
+        resourceToast.classList.toggle("is-left", placement === "left");
+        resourceToast.style.left = `${Math.max(minLeft, Math.min(dockLeft, maxLeft))}px`;
+        resourceToast.style.top = `${dockTop}px`;
+        resourceToast.style.right = "auto";
+        resourceToast.style.bottom = "auto";
+    }
+
     function showResourceToast(properties, style = {}) {
         resourceToast.hidden = false;
         resourceToast.classList.add("is-open");
@@ -207,24 +294,9 @@ document.addEventListener("DOMContentLoaded", function () {
             clearSelectedFeature();
             resourceToast.classList.remove("is-open");
             resourceToast.hidden = true;
+            clearResourceToastPosition();
         });
-    }
-
-    function centerFeature(featureLayer, latlng) {
-        if (latlng) {
-            map.panTo(latlng, { animate: true });
-            return;
-        }
-        if (featureLayer.getLatLng) {
-            map.panTo(featureLayer.getLatLng(), { animate: true });
-            return;
-        }
-        if (featureLayer.getBounds) {
-            const bounds = featureLayer.getBounds();
-            if (bounds.isValid()) {
-                map.panTo(bounds.getCenter(), { animate: true });
-            }
-        }
+        window.requestAnimationFrame(positionResourceToast);
     }
 
     function featureElement(featureLayer) {
@@ -238,11 +310,13 @@ document.addEventListener("DOMContentLoaded", function () {
             element.classList.remove("is-selected");
         }
         selectedFeatureLayer = null;
+        selectedFeatureAnchorLatLng = null;
     }
 
-    function markSelectedFeature(featureLayer) {
+    function markSelectedFeature(featureLayer, latlng = null) {
         clearSelectedFeature();
         selectedFeatureLayer = featureLayer;
+        selectedFeatureAnchorLatLng = latLngForFeature(featureLayer, latlng);
         const element = featureElement(featureLayer);
         if (element) {
             element.classList.add("is-selected");
@@ -250,7 +324,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function selectFeature(featureLayer, properties, style = {}, latlng = null) {
-        markSelectedFeature(featureLayer);
+        markSelectedFeature(featureLayer, latlng);
         centerFeature(featureLayer, latlng);
         showResourceToast(properties, style);
     }
@@ -672,6 +746,14 @@ document.addEventListener("DOMContentLoaded", function () {
         };
 
         fetchWeather(weatherLocation).catch(showWeatherError);
+    }
+
+    map.on("move zoom resize", positionResourceToast);
+    window.addEventListener("resize", positionResourceToast);
+    if (desktopToastQuery.addEventListener) {
+        desktopToastQuery.addEventListener("change", positionResourceToast);
+    } else {
+        desktopToastQuery.addListener(positionResourceToast);
     }
 
     addBoundaryLayers();

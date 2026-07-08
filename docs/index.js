@@ -200,20 +200,36 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
 
-    function resourceDetailsHtml(properties, style = {}) {
+    function resourceDetailsHtml(properties, style = {}, latlng = null) {
         const title = escapeHtml(properties.name || style.popupType || "Map feature");
         const propertyHtml = Object.entries(properties)
             .filter(([, value]) => value !== null && value !== undefined && value !== "")
             .map(([key, value]) => buildKeyValueHtml(key, value))
             .join("");
+        const navigationHtml = properties.navigation ? navigateButtonHtml(latlng) : "";
 
         return `
             <div class="resource-popup">
               <div class="popup-title">${title}</div>
               ${propertyHtml || "<div>No properties available.</div>"}
+              ${navigationHtml}
               <div class="popup-source">${properties.source ? `<i>${escapeHtml(properties.source)}</i> ` : ""} ${properties.id ? `${escapeHtml(properties.id)}` : ""}</div>
             </div>
         `;
+    }
+
+    function navigationUrlForLatLng(latlng) {
+        if (!latlng) return "";
+        const point = L.latLng(latlng);
+        if (!Number.isFinite(point.lat) || !Number.isFinite(point.lng)) return "";
+        const destination = `${point.lat},${point.lng}`;
+        return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}`;
+    }
+
+    function navigateButtonHtml(latlng) {
+        const navigationUrl = navigationUrlForLatLng(latlng);
+        if (!navigationUrl) return "";
+        return `<a class="resource-toast__navigate" href="${escapeHtml(navigationUrl)}" target="_blank" rel="noopener noreferrer">Navigate Here</a>`;
     }
 
     function mobileOffsetPixels(offsetPercent) {
@@ -299,12 +315,12 @@ document.addEventListener("DOMContentLoaded", function () {
         resourceToast.style.bottom = "auto";
     }
 
-    function showResourceToast(properties, style = {}) {
+    function showResourceToast(properties, style = {}, latlng = null) {
         resourceToast.hidden = false;
         resourceToast.classList.add("is-open");
         resourceToast.innerHTML = `
             <button class="resource-toast__close" type="button" aria-label="Close selected feature">&times;</button>
-            ${resourceDetailsHtml(properties, style)}
+            ${resourceDetailsHtml(properties, style, latlng)}
         `;
         resourceToast.querySelector(".resource-toast__close").addEventListener("click", () => {
             clearSelectedFeature();
@@ -342,7 +358,7 @@ document.addEventListener("DOMContentLoaded", function () {
     function selectFeature(featureLayer, properties, style = {}, latlng = null) {
         markSelectedFeature(featureLayer, latlng);
         centerFeature(featureLayer, latlng);
-        showResourceToast(properties, style);
+        showResourceToast(properties, style, selectedFeatureAnchorLatLng);
     }
 
     function markerIcon(style) {
@@ -668,7 +684,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     }
                     map.setView(latlng, 17);
                     markSelectedFeature(locationMarker);
-                    showResourceToast(locationProperties, { popupType: "Your location" });
+                    showResourceToast(locationProperties, { popupType: "Your location" }, latlng);
                     button.disabled = false;
                     button.textContent = "Use My Location";
                 },

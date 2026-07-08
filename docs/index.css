@@ -710,6 +710,30 @@ button.extreme-heat.selected img {
     text-decoration: dotted underline;
 }
 
+.resource-toast .resource-toast__navigate {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: 0.75rem;
+    padding: 0.7rem 0.9rem;
+    border-radius: 0.75rem;
+    background: #1063c7;
+    color: #ffffff;
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.resource-toast__navigate:hover,
+.resource-toast__navigate:focus-visible {
+    background: #0c4f9f;
+    color: #ffffff;
+    outline: 3px solid rgba(16, 99, 199, 0.22);
+    outline-offset: 2px;
+    text-decoration: none;
+}
+
 .resource-toast .smaller.blue {
     color: #1386af;
 }

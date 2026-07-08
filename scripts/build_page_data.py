@@ -9,6 +9,7 @@ JavaScript data file used by docs/index.html and docs/index.js.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -23,6 +24,7 @@ SITE_DIR = ROOT / "docs"
 MAP_CONFIG_PATH = GEOJSON_DIR / "map_config.json"
 MAP_DATA_JS = SITE_DIR / "map_data.js"
 PUBLIC_MAP_TITLE = "Our Neighbourhood Cooling Map"
+ID_LENGTH = 8
 
 DEFAULT_BUFFER_METRES = 500
 
@@ -117,10 +119,36 @@ def make_properties_json_safe(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     return out
 
 
+def marker_hash_id(longitude: float, latitude: float, name: str) -> str:
+    marker_key = f"{longitude},{latitude},{name}"
+    return hashlib.sha256(marker_key.encode("utf-8")).digest()[:ID_LENGTH // 2].hex()
+
+
+def add_marker_ids(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """Add stable IDs to point features rendered as map markers."""
+    if gdf.empty:
+        return gdf
+
+    out = gdf.copy()
+    ids = []
+    for _, row in out.iterrows():
+        geometry = row.geometry
+        if geometry is None or geometry.geom_type != "Point":
+            ids.append(None)
+            continue
+
+        name = json_safe_value(row.get("name", "")) or ""
+        ids.append(marker_hash_id(geometry.x, geometry.y, str(name)))
+
+    if any(marker_id is not None for marker_id in ids):
+        out["id"] = ids
+    return out
+
+
 def gdf_to_feature_collection(gdf: gpd.GeoDataFrame) -> dict:
     if gdf.empty:
         return empty_feature_collection()
-    safe = make_properties_json_safe(gdf)
+    safe = make_properties_json_safe(add_marker_ids(gdf))
     return json.loads(safe.to_json(drop_id=True))
 
 

@@ -123,6 +123,17 @@ document.addEventListener("DOMContentLoaded", function () {
     const desktopToastQuery = window.matchMedia("(min-width: 761px)");
     const mobileCenterQuery = window.matchMedia("(max-width: 760px)");
     const mobileCenterOffsetPercent = data.config?.mobile_center_offset_percent || { x: 0, y: -18 };
+    const feedbackEndpoint = "https://submitform-fsyvmdwtpa-uc.a.run.app";
+    const recaptchaSiteKey = "6LeiikotAAAAACcUfnrOb8fl4yDj4gx7t2HHKb7U";
+    const recaptchaAction = "SUBMIT_FEEDBACK";
+    const feedbackIssueOptions = [
+        { value: "incorrect_location", label: "Location is wrong" },
+        { value: "details_changed", label: "Hours or details changed" },
+        { value: "unavailable", label: "Resource is unavailable" },
+        { value: "accessibility_issue", label: "Accessibility concern" },
+        { value: "other", label: "Other" }
+    ];
+    let recaptchaLoadPromise = null;
 
     const map = L.map("map", {
         center: data.config?.center || [49.2528, -123.1049],
@@ -207,12 +218,14 @@ document.addEventListener("DOMContentLoaded", function () {
             .map(([key, value]) => buildKeyValueHtml(key, value))
             .join("");
         const navigationHtml = properties.navigation ? navigateButtonHtml(latlng) : "";
+        const feedbackHtml = navigationHtml && properties.id ? feedbackButtonHtml() : "";
 
         return `
             <div class="resource-popup">
               <div class="popup-title">${title}</div>
               ${propertyHtml || "<div>No properties available.</div>"}
               ${navigationHtml}
+              ${feedbackHtml}
               <div class="popup-source">${properties.source ? `<i>${escapeHtml(properties.source)}</i> ` : ""} ${properties.id ? `${escapeHtml(properties.id)}` : ""}</div>
             </div>
         `;
@@ -230,6 +243,147 @@ document.addEventListener("DOMContentLoaded", function () {
         const navigationUrl = navigationUrlForLatLng(latlng);
         if (!navigationUrl) return "";
         return `<a class="resource-toast__navigate" href="${escapeHtml(navigationUrl)}" target="_blank" rel="noopener noreferrer">Navigate Here</a>`;
+    }
+
+    function feedbackButtonHtml() {
+        return `<button class="resource-toast__feedback" type="button" data-feedback-button>Send Feedback</button>`;
+    }
+
+    function feedbackIssueOptionsHtml() {
+        return feedbackIssueOptions.map((option, index) => `
+            <label class="resource-feedback__option">
+              <input type="radio" name="issue" value="${escapeHtml(option.value)}" ${index === 0 ? "checked" : ""} />
+              <span>${escapeHtml(option.label)}</span>
+            </label>
+        `).join("");
+    }
+
+    function feedbackFormHtml(properties, style = {}) {
+        const title = escapeHtml(properties.name || style.popupType || "this marker");
+        const markerId = escapeHtml(properties.id || "");
+        const configWarning = !feedbackEndpoint || !recaptchaSiteKey
+            ? `<p class="resource-feedback__status is-error">Feedback is not configured yet.</p>`
+            : "";
+
+        return `
+            <form class="resource-feedback" data-feedback-form>
+              <div class="popup-title">Send Feedback</div>
+              <p class="resource-feedback__intro">Tell us what needs updating for ${title}.</p>
+              <input type="hidden" name="marker" value="${markerId}" />
+              <fieldset class="resource-feedback__fieldset">
+                <legend>What should we fix?</legend>
+                ${feedbackIssueOptionsHtml()}
+              </fieldset>
+              <label class="resource-feedback__field">
+                <span>Comments <small>(optional)</small></span>
+                <textarea name="comments" rows="3"></textarea>
+              </label>
+              <label class="resource-feedback__field">
+                <span>Email <small>(optional)</small></span>
+                <input type="email" name="contactEmail" autocomplete="email" />
+              </label>
+              <p class="resource-feedback__recaptcha-note">This form is protected by reCAPTCHA.</p>
+              ${configWarning}
+              <p class="resource-feedback__status" data-feedback-status></p>
+              <div class="resource-feedback__actions">
+                <button class="resource-feedback__back" type="button" data-feedback-back>Back</button>
+                <button class="resource-feedback__submit" type="submit">Submit Feedback</button>
+              </div>
+            </form>
+        `;
+    }
+
+    function loadRecaptcha() {
+        if (window.grecaptcha?.enterprise?.execute) return Promise.resolve(window.grecaptcha.enterprise);
+        if (recaptchaLoadPromise) return recaptchaLoadPromise;
+
+        recaptchaLoadPromise = new Promise((resolve, reject) => {
+            const script = document.createElement("script");
+            script.src = `https://www.google.com/recaptcha/enterprise.js?render=${encodeURIComponent(recaptchaSiteKey)}`;
+            script.async = true;
+            script.defer = true;
+            script.onload = () => {
+                if (window.grecaptcha?.enterprise) {
+                    resolve(window.grecaptcha.enterprise);
+                } else {
+                    reject(new Error("reCAPTCHA Enterprise failed to load"));
+                }
+            };
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+        return recaptchaLoadPromise;
+    }
+
+    function executeRecaptcha() {
+        if (!recaptchaSiteKey) return Promise.resolve("");
+        return loadRecaptcha().then((grecaptcha) => new Promise((resolve, reject) => {
+            grecaptcha.ready(() => {
+                grecaptcha.execute(recaptchaSiteKey, { action: recaptchaAction })
+                    .then(resolve)
+                    .catch(reject);
+            });
+        }));
+    }
+
+    async function submitFeedbackForm(form) {
+        const status = form.querySelector("[data-feedback-status]");
+        const submitButton = form.querySelector(".resource-feedback__submit");
+        const formData = new FormData(form);
+        const payload = {
+            marker: String(formData.get("marker") || ""),
+            issue: String(formData.get("issue") || ""),
+            comments: String(formData.get("comments") || "").trim(),
+            contactEmail: String(formData.get("contactEmail") || "").trim(),
+            createdAt: new Date().toISOString(),
+            token: ""
+        };
+
+        if (!feedbackEndpoint || !recaptchaSiteKey) {
+            status.textContent = "Feedback is not configured yet.";
+            status.classList.add("is-error");
+            return;
+        }
+        if (!payload.marker) {
+            status.textContent = "This marker does not have an ID for feedback.";
+            status.classList.add("is-error");
+            return;
+        }
+        if (!payload.issue) {
+            status.textContent = "Choose what needs fixing.";
+            status.classList.add("is-error");
+            return;
+        }
+        status.textContent = "Sending feedback...";
+        status.classList.remove("is-error", "is-success");
+        submitButton.disabled = true;
+
+        try {
+            payload.token = await executeRecaptcha();
+            if (!payload.token) {
+                throw new Error("Missing reCAPTCHA token");
+            }
+
+            const response = await fetch(feedbackEndpoint, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                throw new Error(`Feedback request failed with status ${response.status}`);
+            }
+
+            status.textContent = "Thanks, your feedback was sent.";
+            status.classList.add("is-success");
+            form.reset();
+        } catch (error) {
+            console.error("Feedback submission failed:", error);
+            status.textContent = "Could not send feedback. Please try again.";
+            status.classList.add("is-error");
+        } finally {
+            submitButton.disabled = false;
+        }
     }
 
     function mobileOffsetPixels(offsetPercent) {
@@ -328,6 +482,35 @@ document.addEventListener("DOMContentLoaded", function () {
             resourceToast.hidden = true;
             clearResourceToastPosition();
         });
+        resourceToast.querySelector("[data-feedback-button]")?.addEventListener("click", () => {
+            showFeedbackToast(properties, style, latlng);
+        });
+        window.requestAnimationFrame(positionResourceToast);
+    }
+
+    function showFeedbackToast(properties, style = {}, latlng = null) {
+        resourceToast.hidden = false;
+        resourceToast.classList.add("is-open");
+        resourceToast.innerHTML = `
+            <button class="resource-toast__close" type="button" aria-label="Close selected feature">&times;</button>
+            ${feedbackFormHtml(properties, style)}
+        `;
+        resourceToast.querySelector(".resource-toast__close").addEventListener("click", () => {
+            clearSelectedFeature();
+            resourceToast.classList.remove("is-open");
+            resourceToast.hidden = true;
+            clearResourceToastPosition();
+        });
+        resourceToast.querySelector("[data-feedback-back]")?.addEventListener("click", () => {
+            showResourceToast(properties, style, latlng);
+        });
+        const form = resourceToast.querySelector("[data-feedback-form]");
+        if (form) {
+            form.addEventListener("submit", (event) => {
+                event.preventDefault();
+                submitFeedbackForm(form);
+            });
+        }
         window.requestAnimationFrame(positionResourceToast);
     }
 

@@ -1,0 +1,19 @@
+[area_config]
+neighbourhood = "Renfrew-Collingwood"
+neighbourhood_areas = ["Renfrew-Collingwood"]
+buffer_meters = 50
+
+# define what layers are present
+[layer_visibility]
+parks = true
+community_centres = true
+libraries = true
+civic_cooling_places = true
+drinking_fountains = true
+public_washrooms = true
+rapid_transit_stations = true
+resident_input = true
+benches_osm = true
+transit_stops_osm = true
+shaded_walking_routes = true
+

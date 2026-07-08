@@ -1,0 +1,53 @@
+[layers.parks]
+name = "{{park_name}}"
+type = "{{classification}} Park"
+source = "City of Vancouver Open Data"
+
+
+[layers.community_centres]
+name = "{{name}} Community Centre"
+address = "{{address}}"
+source = "City of Vancouver Open Data"
+
+[layers.libraries]
+name = "VPL - {{name}} Branch"
+address = "{{address}}"
+website = "{{urllink}}"
+source = "Vancouver Public Library"
+
+
+[layers.drinking_fountains]
+name = "{{name.replace('\n', ' ').lower().split('location:')[1].strip().title()}} Hydration Station"
+type = "{{name.replace('\n', ' ').lower().split('location:')[0].strip().title()}}"
+location = "{{location}}"
+operating_period = "{{in_operation or 'unknown'}}"
+pet_friendly = "{{pet_friendly == 'Y'}}"
+source = "City of Vancouver Open Data"
+
+[layers.public_washrooms]
+name = "Public Washroom"
+location = "{{location}}"
+hours = "{{summer_hours}}"
+wheelchair_accessible = "{{wheelchair_access == 'Yes'}}"
+source = "City of Vancouver Open Data"
+
+[layers.public_trees]
+name = "{{common_name or species_name or genus_name or 'Public tree'}}"
+type = "{{species_name or genus_name or 'Tree'}}"
+height_m = "{{height_m}}"
+diameter_cm = "{{diameter_cm}}"
+source = "City of Vancouver Open Data"
+
+[layers.rapid_transit_stations]
+name = "{{station}}"
+type = "SkyTrain Station"
+source = "TransLink"
+
+[layers.benches_osm]
+name = "Bench"
+source = "OpenStreetMap"
+
+[layers.transit_stops_osm]
+name = "{{name}}"
+type = "Bus Stop"
+source = "OpenStreetMap"

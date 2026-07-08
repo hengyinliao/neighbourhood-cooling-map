@@ -112,6 +112,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const hasFeatures = (featureCollection) => Boolean(featureCollection?.features?.length);
 
+    const resourceToast = document.createElement("aside");
+    resourceToast.className = "resource-toast";
+    resourceToast.hidden = true;
+    resourceToast.setAttribute("aria-live", "polite");
+    resourceToast.setAttribute("aria-label", "Selected map feature");
+    document.body.appendChild(resourceToast);
+    let selectedFeatureLayer = null;
+
     const map = L.map("map", {
         center: data.config?.center || [49.2528, -123.1049],
         zoom: data.config?.zoom || 15,
@@ -164,32 +172,87 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    function popupHtml(properties, style) {
-        const title = escapeHtml(properties.name || style.popupType);
-        const category = escapeHtml(properties.category || style.popupType);
-        const source = escapeHtml(properties.source || "Open data");
-        const extraFields = [
-            ["Resident note", "description"],
-            ["Good for", "best_for"],
-            ["Verified", "verified"],
-            ["Session", "contact_or_session"]
-        ];
-        const extraHtml = extraFields
-            .map(([label, field]) => {
-                const value = properties[field];
-                return value ? `<div><b>${label}:</b> ${escapeHtml(value)}</div>` : "";
-            })
+    function propertyValueText(value) {
+        if (Array.isArray(value) || (value && typeof value === "object")) {
+            return JSON.stringify(value);
+        }
+        return String(value);
+    }
+
+    function resourceDetailsHtml(properties, style = {}) {
+        const title = escapeHtml(properties.name || style.popupType || "Map feature");
+        const propertyHtml = Object.entries(properties)
+            .filter(([, value]) => value !== null && value !== undefined && value !== "")
+            .map(([key, value]) => `
+                <div><b>${escapeHtml(key)}:</b> ${escapeHtml(propertyValueText(value))}</div>
+            `)
             .join("");
 
         return `
             <div class="resource-popup">
               <div class="popup-title">${title}</div>
-              <div><b>What it is:</b> ${category}</div>
-              <div><b>Helpful note:</b> ${escapeHtml(style.help)}</div>
-              ${extraHtml}
-              <div class="popup-source">Source: ${source}</div>
+              ${propertyHtml || "<div>No properties available.</div>"}
             </div>
         `;
+    }
+
+    function showResourceToast(properties, style = {}) {
+        resourceToast.hidden = false;
+        resourceToast.classList.add("is-open");
+        resourceToast.innerHTML = `
+            <button class="resource-toast__close" type="button" aria-label="Close selected feature">&times;</button>
+            ${resourceDetailsHtml(properties, style)}
+        `;
+        resourceToast.querySelector(".resource-toast__close").addEventListener("click", () => {
+            clearSelectedFeature();
+            resourceToast.classList.remove("is-open");
+            resourceToast.hidden = true;
+        });
+    }
+
+    function centerFeature(featureLayer, latlng) {
+        if (latlng) {
+            map.panTo(latlng, { animate: true });
+            return;
+        }
+        if (featureLayer.getLatLng) {
+            map.panTo(featureLayer.getLatLng(), { animate: true });
+            return;
+        }
+        if (featureLayer.getBounds) {
+            const bounds = featureLayer.getBounds();
+            if (bounds.isValid()) {
+                map.panTo(bounds.getCenter(), { animate: true });
+            }
+        }
+    }
+
+    function featureElement(featureLayer) {
+        if (!featureLayer?.getElement) return null;
+        return featureLayer.getElement();
+    }
+
+    function clearSelectedFeature() {
+        const element = featureElement(selectedFeatureLayer);
+        if (element) {
+            element.classList.remove("is-selected");
+        }
+        selectedFeatureLayer = null;
+    }
+
+    function markSelectedFeature(featureLayer) {
+        clearSelectedFeature();
+        selectedFeatureLayer = featureLayer;
+        const element = featureElement(featureLayer);
+        if (element) {
+            element.classList.add("is-selected");
+        }
+    }
+
+    function selectFeature(featureLayer, properties, style = {}, latlng = null) {
+        markSelectedFeature(featureLayer);
+        centerFeature(featureLayer, latlng);
+        showResourceToast(properties, style);
     }
 
     function markerIcon(style) {
@@ -223,9 +286,10 @@ document.addEventListener("DOMContentLoaded", function () {
             pointToLayer(feature, latlng) {
                 const properties = feature.properties || {};
                 const style = styleForFeature(properties);
-                return L.marker(latlng, { icon: markerIcon(style) })
-                    .bindTooltip(String(properties.name || name))
-                    .bindPopup(popupHtml(properties, style), { maxWidth: 380 });
+                const marker = L.marker(latlng, { icon: markerIcon(style) })
+                    .bindTooltip(String(properties.name || name));
+                marker.on("click", () => selectFeature(marker, properties, style, latlng));
+                return marker;
             }
         }).eachLayer((layer) => target.addLayer(layer));
 
@@ -261,14 +325,11 @@ document.addEventListener("DOMContentLoaded", function () {
             onEachFeature(feature, featureLayer) {
                 const properties = feature.properties || {};
                 const name = String(properties.name || "Park or green space");
-                featureLayer.bindTooltip(`${escapeHtml(name)}<br>${escapeHtml(properties.category || "")}`);
-                featureLayer.bindPopup(`
-                    <div class="resource-popup">
-                      <div class="popup-title">${escapeHtml(name)}</div>
-                      <div><b>Type:</b> ${escapeHtml(properties.category || "Park or green space")}</div>
-                    </div>
-                `);
-                parkSearchRecords.push({ name, layer: featureLayer });
+                featureLayer.bindTooltip(`${escapeHtml(name)}<br>${escapeHtml(properties.type || properties.category || "")}`);
+                featureLayer.on("click", (event) => {
+                    selectFeature(featureLayer, properties, { popupType: "Park or green space" }, event.latlng);
+                });
+                parkSearchRecords.push({ name, layer: featureLayer, properties });
             }
         });
 
@@ -297,6 +358,9 @@ document.addEventListener("DOMContentLoaded", function () {
                     ${escapeHtml(properties.category || "Shade estimate")}<br>
                     ${escapeHtml(trees)}
                 `);
+                featureLayer.on("click", (event) => {
+                    selectFeature(featureLayer, properties, { popupType: "Walking route segment" }, event.latlng);
+                });
             }
         });
 
@@ -402,8 +466,12 @@ document.addEventListener("DOMContentLoaded", function () {
         const selectRecord = (record) => {
             setLayerVisible("Parks and green spaces", true);
             syncLegendState();
-            map.fitBounds(record.layer.getBounds(), { maxZoom: 17, padding: [40, 40] });
-            record.layer.openPopup();
+            markSelectedFeature(record.layer);
+            centerFeature(record.layer);
+            if (record.layer.getBounds) {
+                map.fitBounds(record.layer.getBounds(), { maxZoom: 17, padding: [40, 40] });
+            }
+            showResourceToast(record.properties, { popupType: "Park or green space" });
             input.value = record.name;
             closeResults();
         };
@@ -459,12 +527,18 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!button || !navigator.geolocation) return;
 
         let locationMarker = null;
+        let locationProperties = null;
         button.addEventListener("click", () => {
             button.disabled = true;
             button.textContent = "Finding location...";
             navigator.geolocation.getCurrentPosition(
                 (position) => {
                     const latlng = [position.coords.latitude, position.coords.longitude];
+                    locationProperties = {
+                        name: "Your approximate location",
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude
+                    };
                     if (locationMarker) {
                         locationMarker.setLatLng(latlng);
                     } else {
@@ -474,10 +548,14 @@ document.addEventListener("DOMContentLoaded", function () {
                             weight: 3,
                             fillColor: "#ffffff",
                             fillOpacity: 1
-                        }).addTo(map).bindPopup("Your approximate location");
+                        }).addTo(map);
+                        locationMarker.on("click", () => {
+                            selectFeature(locationMarker, locationProperties, { popupType: "Your location" });
+                        });
                     }
                     map.setView(latlng, 17);
-                    locationMarker.openPopup();
+                    markSelectedFeature(locationMarker);
+                    showResourceToast(locationProperties, { popupType: "Your location" });
                     button.disabled = false;
                     button.textContent = "Use My Location";
                 },
@@ -506,7 +584,17 @@ document.addEventListener("DOMContentLoaded", function () {
         };
         if (!widget || Object.values(fields).some((field) => !field)) return;
 
-        const rileyParkLocation = { latitude: 49.2447, longitude: -123.1039, label: "Riley Park - Little Mountain" };
+        const formatLocalAreaLabel = (localAreas = []) => {
+            if (localAreas.length === 1) return localAreas[0];
+            if (localAreas.length === 2) return `${localAreas[0]} and ${localAreas[1]}`;
+            if (localAreas.length >= 3) return `${localAreas[0]}, ${localAreas[1]}, and more`;
+            return "selected area";
+        };
+        const weatherLocation = {
+            latitude: data.config?.center?.[0] ?? 49.2447,
+            longitude: data.config?.center?.[1] ?? -123.1039,
+            label: formatLocalAreaLabel(data.config?.local_areas)
+        };
         const round = (value) => Math.round(Number(value));
         const formatUv = (value) => Number(value).toFixed(1).replace(".0", "");
         const getCloudLabel = (cover) => {
@@ -583,7 +671,7 @@ document.addEventListener("DOMContentLoaded", function () {
             fields.status.textContent = "Weather data is unavailable right now.";
         };
 
-        fetchWeather(rileyParkLocation).catch(showWeatherError);
+        fetchWeather(weatherLocation).catch(showWeatherError);
     }
 
     addBoundaryLayers();

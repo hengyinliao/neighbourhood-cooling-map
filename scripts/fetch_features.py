@@ -320,6 +320,7 @@ def standardize(
                 raise ValueError(
                     f"Failed to evaluate layer_properties template for "
                     f"{layer}.{out_col} at source row {idx}: {template!r}"
+                    f" at {context!r}"
                 ) from exc
         out[out_col] = pd.Series(values, index=gdf.index, dtype="object")
     return out
@@ -370,8 +371,8 @@ def load_city_resources(
 
     layers["civic_cooling_places"] = combine_layers(
         [
-            layers["community_centres"].assign(category="Potential civic cooling place"),
-            layers["libraries"].assign(category="Potential civic cooling place"),
+            layers["community_centres"],
+            layers["libraries"]
         ]
     )
 

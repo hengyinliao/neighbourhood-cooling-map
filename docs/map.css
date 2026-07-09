@@ -522,6 +522,7 @@ button.extreme-heat.selected img {
     padding: 1rem;
     margin: 18px 0;
     display: flex;
+    z-index: 1000;
     flex-direction: column;
     justify-content: space-between;
     color: white;
@@ -828,6 +829,10 @@ button.extreme-heat.selected img {
     text-align: center;
 }
 
+.mobile-panel-drag-handle {
+    display: none;
+}
+
 @media (max-width: 1100px) {
     .app {
         grid-template-columns: 1fr;
@@ -870,14 +875,58 @@ button.extreme-heat.selected img {
 
     .left-panel {
         position: fixed;
-        overflow-y: scroll;
+        overflow: visible;
         bottom: 0;
         left: 0;
         width: 100vw;
-        max-height: 45vh;
+        min-width: 0;
+        height: var(--mobile-panel-height, 45vh);
+        min-height: 12rem;
+        max-height: min(85vh, calc(100vh - 1rem));
+        padding-top: 2.4rem;
         border-radius: 2rem 2rem 0 0;
         z-index: 1000;
         box-shadow: 0 -3px 30px #00000033;
+        overscroll-behavior: contain;
+        transition: height 180ms ease;
+        scrollbar-gutter: stable;
+    }
+
+    .left-panel.is-dragging {
+        user-select: none;
+        transition: none;
+    }
+
+    .mobile-panel-drag-handle {
+        position: absolute;
+        top: 0.5rem;
+        left: 50%;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        width: 100vw;
+        height: 5rem;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        cursor: ns-resize;
+        touch-action: none;
+        transform: translateX(-50%);
+        z-index: 2;
+    }
+
+    .mobile-panel-drag-handle::before {
+        content: "";
+        display: block;
+        width: 2.75rem;
+        height: 0.28rem;
+        border-radius: 999px;
+        background: #c8d4e3;
+    }
+
+    .mobile-panel-drag-handle:focus-visible {
+        outline: 3px solid rgba(16, 99, 199, 0.22);
+        outline-offset: 2px;
     }
 
     .leaflet-top.leaflet-left {

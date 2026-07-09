@@ -220,7 +220,7 @@ document.addEventListener("DOMContentLoaded", function () {
             .map(([key, value]) => buildKeyValueHtml(key, value))
             .join("");
         const navigationHtml = properties.navigation ? navigateButtonHtml(latlng) : "";
-        const feedbackHtml = navigationHtml && properties.id ? feedbackButtonHtml() : "";
+        const feedbackHtml = properties.edit ? feedbackButtonHtml() : "";
 
         return `
             <div class="resource-popup">
@@ -715,6 +715,133 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
+    function setupMobilePanelDrag() {
+        const panel = document.querySelector(".left-panel");
+        if (!panel) return;
+
+        const handle = document.createElement("button");
+        handle.className = "mobile-panel-drag-handle";
+        handle.type = "button";
+        handle.setAttribute("aria-label", "Resize map controls panel");
+        panel.prepend(handle);
+
+        let dragState = null;
+        let suppressClick = false;
+
+        const panelLimits = () => {
+            const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+            const topGap = 16;
+            const maxHeight = Math.max(192, viewportHeight - topGap);
+            const minHeight = Math.min(Math.max(192, viewportHeight * 0.24), maxHeight);
+            const expandedHeight = Math.min(viewportHeight * 0.85, maxHeight);
+
+            return {
+                min: minHeight,
+                max: Math.max(minHeight, expandedHeight),
+                initial: Math.max(minHeight, Math.min(viewportHeight * 0.45, expandedHeight))
+            };
+        };
+
+        const clampPanelHeight = (height) => {
+            const limits = panelLimits();
+            return Math.max(limits.min, Math.min(height, limits.max));
+        };
+
+        const setPanelHeight = (height) => {
+            panel.style.setProperty("--mobile-panel-height", `${Math.round(clampPanelHeight(height))}px`);
+        };
+
+        const currentPanelHeight = () => {
+            const measuredHeight = panel.getBoundingClientRect().height;
+            return measuredHeight || panelLimits().initial;
+        };
+
+        const syncPanelHeight = () => {
+            if (!mobileCenterQuery.matches) {
+                panel.classList.remove("is-dragging");
+                panel.style.removeProperty("--mobile-panel-height");
+                dragState = null;
+                return;
+            }
+
+            const explicitHeight = panel.style.getPropertyValue("--mobile-panel-height");
+            setPanelHeight(explicitHeight ? currentPanelHeight() : panelLimits().initial);
+        };
+
+        handle.addEventListener("pointerdown", (event) => {
+            if (!mobileCenterQuery.matches || event.button > 0) return;
+
+            event.preventDefault();
+            dragState = {
+                pointerId: event.pointerId,
+                startY: event.clientY,
+                startHeight: currentPanelHeight(),
+                moved: false
+            };
+            panel.classList.add("is-dragging");
+            handle.setPointerCapture(event.pointerId);
+        });
+
+        handle.addEventListener("pointermove", (event) => {
+            if (!dragState || dragState.pointerId !== event.pointerId) return;
+
+            event.preventDefault();
+            const deltaY = dragState.startY - event.clientY;
+            dragState.moved = dragState.moved || Math.abs(deltaY) > 3;
+            setPanelHeight(dragState.startHeight + deltaY);
+        });
+
+        const endDrag = (event) => {
+            if (!dragState || dragState.pointerId !== event.pointerId) return;
+
+            suppressClick = dragState.moved;
+            dragState = null;
+            panel.classList.remove("is-dragging");
+        };
+
+        handle.addEventListener("pointerup", endDrag);
+        handle.addEventListener("pointercancel", endDrag);
+        handle.addEventListener("lostpointercapture", () => {
+            dragState = null;
+            panel.classList.remove("is-dragging");
+        });
+        handle.addEventListener("click", (event) => {
+            if (!suppressClick) return;
+
+            event.preventDefault();
+            suppressClick = false;
+        });
+        handle.addEventListener("keydown", (event) => {
+            if (!mobileCenterQuery.matches) return;
+
+            const step = event.shiftKey ? 96 : 32;
+            if (event.key === "ArrowUp") {
+                event.preventDefault();
+                setPanelHeight(currentPanelHeight() + step);
+            }
+            if (event.key === "ArrowDown") {
+                event.preventDefault();
+                setPanelHeight(currentPanelHeight() - step);
+            }
+            if (event.key === "Home") {
+                event.preventDefault();
+                setPanelHeight(panelLimits().min);
+            }
+            if (event.key === "End") {
+                event.preventDefault();
+                setPanelHeight(panelLimits().max);
+            }
+        });
+
+        window.addEventListener("resize", syncPanelHeight);
+        if (mobileCenterQuery.addEventListener) {
+            mobileCenterQuery.addEventListener("change", syncPanelHeight);
+        } else {
+            mobileCenterQuery.addListener(syncPanelHeight);
+        }
+        syncPanelHeight();
+    }
+
     function setupLegendLayerBridge() {
         document.querySelectorAll(".legend-item[data-layer]").forEach((button) => {
             button.addEventListener("click", () => {
@@ -1001,6 +1128,7 @@ document.addEventListener("DOMContentLoaded", function () {
     addShadedRouteLayer();
     addPointLayers();
     setupLegendExpansionToggle();
+    setupMobilePanelDrag();
     setupLegendLayerBridge();
     setupScenarioButtons();
     setupParkSearch();

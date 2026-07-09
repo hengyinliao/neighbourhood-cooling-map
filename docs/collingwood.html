@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Our Neighbourhood Cooling Map</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/MarkerCluster.Default.css" />
+  <link rel="stylesheet" href="map.css" />
+</head>
+<body>
+  <main class="app">
+    <aside class="panel left-panel">
+      <div class="logo-container">
+        <img src="assets/logo.svg" alt="Our Neighbourhood Cooling Map logo" />
+        <p>Find cool places.<br>Stay safe.<br>Help our community.</p>
+      </div>
+
+      <section class="weather-widget" aria-label="Current weather" aria-live="polite">
+        <div class="weather-widget__header">
+          <span class="weather-widget__eyebrow">Current Weather</span>
+          <span class="weather-widget__condition" data-weather-cloud>Loading</span>
+        </div>
+
+        <div class="weather-widget__temp">
+          <span data-weather-temp>--</span><sup>°C</sup>
+        </div>
+
+        <div class="weather-widget__range">
+          <span>Low <strong data-weather-low>--°</strong></span>
+          <span>High <strong data-weather-high>--°</strong></span>
+        </div>
+
+        <div class="weather-widget__stats">
+          <span>Cloud <strong data-weather-cloud-cover>--%</strong></span>
+          <span>UV <strong data-weather-uv>--</strong></span>
+        </div>
+
+        <p class="weather-widget__status" data-weather-status>Fetching weather conditions...</p>
+      </section>
+
+      <section>
+        <h2>Search</h2>
+        <div class="search-bridge">
+          <input class="search" data-park-search placeholder="Search park name..." autocomplete="off" />
+        </div>
+        <button class="location-btn" type="button" data-location-button>Use My Location</button>
+      </section>
+
+      <section>
+        <h2>Scenario</h2>
+        <div class="chips">
+          <button class="general selected" type="button" data-scenario="all"><img src="assets/icons/user.svg" alt="">General</button>
+          <button class="family" type="button" data-scenario="family"><img src="assets/icons/family.svg" alt="">Family</button>
+          <button class="senior" type="button" data-scenario="senior"><img src="assets/icons/elderly.svg" alt="">Senior</button>
+          <button class="extreme-heat" type="button" data-scenario="heat"><img src="assets/icons/tempHigh.svg" alt="">Extreme Heat</button>
+        </div>
+      </section>
+
+      <section>
+        <h2 class="toggle-bar">Cooling Nearby<span class="legend-toggle" role="button" tabindex="0" aria-controls="cooling-nearby-legend" aria-expanded="false" aria-label="Expand cooling nearby legend">&gt;</span></h2>
+        <div class="legend" id="cooling-nearby-legend" aria-label="Cooling nearby legend" aria-expanded="false">
+          <div class="legend-items">
+            <button class="legend-item" type="button" data-layer="Community centres and libraries" style="--legend-color: #76c6ff;">
+              <span class="legend-icon"><img src="assets/icons/tempLow.svg" alt="" /></span>
+              <span>Community centres and libraries</span>
+            </button>
+            <button class="legend-item" type="button" data-layer="Water fountains" style="--legend-color: #1366ff;">
+              <span class="legend-icon"><img src="assets/icons/waterRefill.svg" alt="" /></span>
+              <span>Drinking fountains</span>
+            </button>
+            <button class="legend-item" type="button" data-layer="Public washrooms" style="--legend-color: #7c5bd6;">
+              <span class="legend-icon"><img src="assets/icons/restroom.svg" alt="" /></span>
+              <span>Public washrooms</span>
+            </button>
+            <button class="legend-item" type="button" data-layer="Benches and places to sit" style="--legend-color: #ec8f2a;">
+              <span class="legend-icon"><img src="assets/icons/chair.svg" alt="" /></span>
+              <span>Benches and places to sit</span>
+            </button>
+            <button class="legend-item" type="button" data-layer="Bus and transit stops" style="--legend-color: #76afff;">
+              <span class="legend-icon"><img src="assets/icons/bus.svg" alt="" /></span>
+              <span>Transit stops</span>
+            </button>
+            <button class="legend-item" type="button" data-layer="Train and rapid transit stations" style="--legend-color: #1f5a9d;">
+              <span class="legend-icon"><img src="assets/icons/subway.svg" alt="" /></span>
+              <span>SkyTrain or rapid transit station</span>
+            </button>
+            <button class="legend-item" type="button" data-layer="Resident feedback and workshop notes" style="--legend-color: #2fbf71;">
+              <span class="legend-icon"><img src="assets/icons/thumbsUp.svg" alt="" /></span>
+              <span>Resident recommended place</span>
+            </button>
+            <button class="legend-item" type="button" data-layer="Resident feedback and workshop notes" style="--legend-color: #f54b20;">
+              <span class="legend-icon"><img src="assets/icons/tempHigh.svg" alt="" /></span>
+              <span>Resident identified hot spot</span>
+            </button>
+            <button class="legend-item" type="button" data-layer="Resident feedback and workshop notes" style="--legend-color: #ffd900;">
+              <span class="legend-icon"><img src="assets/icons/suggestion.svg" alt="" /></span>
+              <span>Resident suggestion or need</span>
+            </button>
+            <button class="legend-item" type="button" data-layer="Possible shady walking routes" style="--legend-color: #178f4c;">
+              <span class="legend-route" aria-hidden="true"></span>
+              <span>Possible shady walking route</span>
+            </button>
+          </div>
+        </div>
+      </section>
+    </aside>
+
+    <div id="map" aria-label="Cooling resource map"></div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/leaflet.markercluster.js"></script>
+  <script src="map_data_collingwood.js"></script>
+  <script src="map.js"></script>
+</body>
+</html>

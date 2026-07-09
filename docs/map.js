@@ -195,7 +195,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function buildKeyValueHtml(key, value) {
-        if (["name", "latitude", "longitude", "source", "id", "navigation", "edit"].includes(key)) return "";
+        if (!["type", "location", "address", "trees_per_100m", "shade_potential", "hours", "operating_period", "pet_friendly", "wheelchair_accessible", "website", "feedback_type", "description"].includes(key)) return "";
         if (key === "type") return `<span class="smaller blue">${escapeHtml(propertyValueText(value))}</span>`;
         if (key === "location") return `<div>Located at ${escapeHtml(propertyValueText(value)).replace(/\bat\b/gi, "")}</div>`;
         if (key === "address") return `<div>Address: ${escapeHtml(propertyValueText(value))}</div>`;
@@ -206,6 +206,8 @@ document.addEventListener("DOMContentLoaded", function () {
         if (key === "pet_friendly") return value ? `<div class="green">Pet friendly</div>` : "";
         if (key === "wheelchair_accessible") return value ? `<div class="green">Wheelchair accessible</div>` : "";
         if (key === "website") return `<div><a href="${escapeHtml(value)}" target="_blank" rel="noopener noreferrer">Website &nearr;</a></div>`;
+        if (key === "feedback_type") return `<div><b>Feedback type:</b> ${escapeHtml(propertyValueText(value)).replace(/_/g, " ")}</div>`;
+        if (key === "description") return `<div><b>Description:</b> ${escapeHtml(propertyValueText(value))}</div>`;
 
         return `<div><b>${escapeHtml(key)}:</b> ${escapeHtml(propertyValueText(value))}</div>`;
     }
@@ -287,7 +289,7 @@ document.addEventListener("DOMContentLoaded", function () {
               <p class="resource-feedback__status" data-feedback-status></p>
               <div class="resource-feedback__actions">
                 <button class="resource-feedback__back" type="button" data-feedback-back>Back</button>
-                <button class="resource-feedback__submit" type="submit">Submit Feedback</button>
+                <button class="resource-feedback__submit" type="submit">Submit</button>
               </div>
             </form>
         `;

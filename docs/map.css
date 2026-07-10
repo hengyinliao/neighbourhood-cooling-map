@@ -914,6 +914,10 @@ button.extreme-heat.selected img {
         transition: none;
     }
 
+    .left-panel.is-toast-collapsed .mobile-panel-drag-handle {
+        pointer-events: none;
+    }
+
     .mobile-panel-drag-handle {
         position: absolute;
         top: 0.5rem;
@@ -981,13 +985,14 @@ button.extreme-heat.selected img {
     }
 
     .resource-toast {
-        font-size: 1.2rem;
+        font-size: 1.1rem;
         top: auto;
         right: 0;
         bottom: 0;
         left: 0;
         width: auto;
-        min-height: 45vh;
+        max-height: 40vh;
+        padding: 2rem;
         border-radius: 2rem 2rem 0 0;
     }
 }

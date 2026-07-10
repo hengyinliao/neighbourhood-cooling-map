@@ -147,6 +147,8 @@ document.addEventListener("DOMContentLoaded", function () {
     ];
     let recaptchaLoadPromise = null;
     let noteMarker = null;
+    let collapseMobilePanelForToast = null;
+    let restoreMobilePanelAfterToast = null;
 
     const map = L.map("map", {
         center: data.config?.center || [49.2528, -123.1049],
@@ -494,6 +496,19 @@ document.addEventListener("DOMContentLoaded", function () {
         resourceToast.style.removeProperty("left");
     }
 
+    function handleResourceToastOpened() {
+        if (mobileCenterQuery.matches && collapseMobilePanelForToast && !restoreMobilePanelAfterToast) {
+            restoreMobilePanelAfterToast = collapseMobilePanelForToast();
+        }
+    }
+
+    function handleResourceToastClosed() {
+        if (restoreMobilePanelAfterToast) {
+            restoreMobilePanelAfterToast();
+            restoreMobilePanelAfterToast = null;
+        }
+    }
+
     function positionResourceToast() {
         if (resourceToast.hidden || !desktopToastQuery.matches || !selectedFeatureAnchorLatLng) {
             clearResourceToastPosition();
@@ -532,16 +547,12 @@ document.addEventListener("DOMContentLoaded", function () {
     function showResourceToast(properties, style = {}, latlng = null) {
         resourceToast.hidden = false;
         resourceToast.classList.add("is-open");
+        handleResourceToastOpened();
         resourceToast.innerHTML = `
             <button class="resource-toast__close" type="button" aria-label="Close selected feature">&times;</button>
             ${resourceDetailsHtml(properties, style, latlng)}
         `;
-        resourceToast.querySelector(".resource-toast__close").addEventListener("click", () => {
-            clearSelectedFeature();
-            resourceToast.classList.remove("is-open");
-            resourceToast.hidden = true;
-            clearResourceToastPosition();
-        });
+        resourceToast.querySelector(".resource-toast__close").addEventListener("click", closeResourceToast);
         resourceToast.querySelector("[data-feedback-button]")?.addEventListener("click", () => {
             showFeedbackToast(properties, style, latlng);
         });
@@ -551,22 +562,15 @@ document.addEventListener("DOMContentLoaded", function () {
     function showFeedbackToast(properties, style = {}, latlng = null) {
         resourceToast.hidden = false;
         resourceToast.classList.add("is-open");
+        handleResourceToastOpened();
         resourceToast.innerHTML = `
             <button class="resource-toast__close" type="button" aria-label="Close selected feature">&times;</button>
             ${feedbackFormHtml(properties, style)}
         `;
-        resourceToast.querySelector(".resource-toast__close").addEventListener("click", () => {
-            clearSelectedFeature();
-            resourceToast.classList.remove("is-open");
-            resourceToast.hidden = true;
-            clearResourceToastPosition();
-        });
+        resourceToast.querySelector(".resource-toast__close").addEventListener("click", closeResourceToast);
         resourceToast.querySelector("[data-feedback-back]")?.addEventListener("click", () => {
             if (properties.feedbackKind === "note_to_others") {
-                clearSelectedFeature();
-                resourceToast.classList.remove("is-open");
-                resourceToast.hidden = true;
-                clearResourceToastPosition();
+                closeResourceToast();
                 return;
             }
             showResourceToast(properties, style, latlng);
@@ -637,6 +641,7 @@ document.addEventListener("DOMContentLoaded", function () {
         resourceToast.classList.remove("is-open");
         resourceToast.hidden = true;
         clearResourceToastPosition();
+        handleResourceToastClosed();
     }
 
     function showBoundaryNote(latlng) {
@@ -645,6 +650,7 @@ document.addEventListener("DOMContentLoaded", function () {
         clearSelectedFeature();
         resourceToast.hidden = false;
         resourceToast.classList.add("is-open");
+        handleResourceToastOpened();
         selectedFeatureAnchorLatLng = latlng;
         resourceToast.innerHTML = `
             <button class="resource-toast__close" type="button" aria-label="Close message">&times;</button>
@@ -707,6 +713,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         const container = map.getContainer();
         let longPress = null;
+        const activeTouchPointers = new Set();
 
         const clearLongPress = () => {
             if (longPress?.timer) {
@@ -718,12 +725,22 @@ document.addEventListener("DOMContentLoaded", function () {
         container.addEventListener("pointerdown", (event) => {
             if (event.pointerType === "mouse" || event.button !== 0) return;
 
+            activeTouchPointers.add(event.pointerId);
+            if (activeTouchPointers.size !== 1) {
+                clearLongPress();
+                return;
+            }
+
             const start = L.point(event.clientX, event.clientY);
             const latlng = map.mouseEventToLatLng(event);
             longPress = {
                 pointerId: event.pointerId,
                 start,
                 timer: window.setTimeout(() => {
+                    if (activeTouchPointers.size !== 1 || !activeTouchPointers.has(event.pointerId)) {
+                        clearLongPress();
+                        return;
+                    }
                     dropNoteMarker(latlng);
                     clearLongPress();
                 }, 650)
@@ -741,6 +758,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         ["pointerup", "pointercancel", "pointerleave"].forEach((eventName) => {
             container.addEventListener(eventName, (event) => {
+                activeTouchPointers.delete(event.pointerId);
                 if (!longPress || longPress.pointerId !== event.pointerId) return;
                 clearLongPress();
             });
@@ -938,6 +956,29 @@ document.addEventListener("DOMContentLoaded", function () {
             panel.style.setProperty("--mobile-panel-height", `${Math.round(clampPanelHeight(height))}px`);
         };
 
+        collapseMobilePanelForToast = () => {
+            if (!mobileCenterQuery.matches) return null;
+
+            const previousHeight = panel.style.getPropertyValue("--mobile-panel-height");
+            panel.classList.remove("is-dragging");
+            panel.classList.add("is-toast-collapsed");
+            dragState = null;
+            setPanelHeight(panelLimits().min);
+
+            return () => {
+                panel.classList.remove("is-toast-collapsed");
+                if (!mobileCenterQuery.matches) {
+                    panel.style.removeProperty("--mobile-panel-height");
+                    return;
+                }
+                if (previousHeight) {
+                    panel.style.setProperty("--mobile-panel-height", previousHeight);
+                    return;
+                }
+                syncPanelHeight();
+            };
+        };
+
         const currentPanelHeight = () => {
             const measuredHeight = panel.getBoundingClientRect().height;
             return measuredHeight || panelLimits().initial;
@@ -946,8 +987,19 @@ document.addEventListener("DOMContentLoaded", function () {
         const syncPanelHeight = () => {
             if (!mobileCenterQuery.matches) {
                 panel.classList.remove("is-dragging");
+                panel.classList.remove("is-toast-collapsed");
                 panel.style.removeProperty("--mobile-panel-height");
                 dragState = null;
+                return;
+            }
+
+            if (!resourceToast.hidden && !restoreMobilePanelAfterToast && collapseMobilePanelForToast) {
+                restoreMobilePanelAfterToast = collapseMobilePanelForToast();
+                return;
+            }
+
+            if (restoreMobilePanelAfterToast) {
+                setPanelHeight(panelLimits().min);
                 return;
             }
 
@@ -956,7 +1008,7 @@ document.addEventListener("DOMContentLoaded", function () {
         };
 
         handle.addEventListener("pointerdown", (event) => {
-            if (!mobileCenterQuery.matches || event.button > 0) return;
+            if (!mobileCenterQuery.matches || event.button > 0 || restoreMobilePanelAfterToast) return;
 
             event.preventDefault();
             dragState = {

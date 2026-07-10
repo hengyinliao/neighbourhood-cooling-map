@@ -61,6 +61,12 @@ document.addEventListener("DOMContentLoaded", function () {
             className: "resident-need-marker",
             popupType: "Resident suggestion",
             help: "A place residents suggested for improvement, clearer information, or future action."
+        },
+        noteMarker: {
+            icon: "assets/icons/edit.svg",
+            className: "note-marker",
+            popupType: "Note to others",
+            help: "A note dropped by a map user to share information with others."
         }
     };
 
@@ -133,7 +139,14 @@ document.addEventListener("DOMContentLoaded", function () {
         { value: "accessibility_issue", label: "Accessibility concern" },
         { value: "other", label: "Other" }
     ];
+    const noteIssueOptions = [
+        { value: "too_hot_to_stay", label: "Too hot to stay here" },
+        { value: "great_cooling_spot", label: "Great cooling off spot" },
+        { value: "needs_improvement", label: "Needs improvement" },
+        { value: "other", label: "Other" }
+    ];
     let recaptchaLoadPromise = null;
+    let noteMarker = null;
 
     const map = L.map("map", {
         center: data.config?.center || [49.2528, -123.1049],
@@ -251,8 +264,8 @@ document.addEventListener("DOMContentLoaded", function () {
         return `<button class="resource-toast__feedback" type="button" data-feedback-button>Send Feedback</button>`;
     }
 
-    function feedbackIssueOptionsHtml() {
-        return feedbackIssueOptions.map((option, index) => `
+    function feedbackIssueOptionsHtml(options = feedbackIssueOptions) {
+        return options.map((option, index) => `
             <label class="resource-feedback__option">
               <input type="radio" name="issue" value="${escapeHtml(option.value)}" ${index === 0 ? "checked" : ""} />
               <span>${escapeHtml(option.label)}</span>
@@ -261,20 +274,28 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function feedbackFormHtml(properties, style = {}) {
-        const title = escapeHtml(properties.name || style.popupType || "this marker");
-        const markerId = escapeHtml(properties.id || "");
+        const title = properties.name || style.popupType || "this marker";
+        const markerId = escapeHtml(properties.feedbackMarker || properties.id || "");
+        const isLocationNote = properties.feedbackKind === "note_to_others";
+        const formTitle = isLocationNote ? "Notes to Others" : "Send Feedback";
+        const intro = isLocationNote
+            ? "Share a quick note about this location for others using the map."
+            : `Tell us what needs updating for ${title}.`;
+        const legend = isLocationNote ? "What should others know?" : "What should we fix?";
+        const options = isLocationNote ? noteIssueOptions : feedbackIssueOptions;
+        const backLabel = isLocationNote ? "Cancel" : "Back";
         const configWarning = !feedbackEndpoint || !recaptchaSiteKey
             ? `<p class="resource-feedback__status is-error">Feedback is not configured yet.</p>`
             : "";
 
         return `
             <form class="resource-feedback" data-feedback-form>
-              <div class="popup-title">Send Feedback</div>
-              <p class="resource-feedback__intro">Tell us what needs updating for ${title}.</p>
+              <div class="popup-title">${formTitle}</div>
+              <p class="resource-feedback__intro">${escapeHtml(intro)}</p>
               <input type="hidden" name="marker" value="${markerId}" />
               <fieldset class="resource-feedback__fieldset">
-                <legend>What should we fix?</legend>
-                ${feedbackIssueOptionsHtml()}
+                <legend>${legend}</legend>
+                ${feedbackIssueOptionsHtml(options)}
               </fieldset>
               <label class="resource-feedback__field">
                 <span>Comments <small>(optional)</small></span>
@@ -288,7 +309,7 @@ document.addEventListener("DOMContentLoaded", function () {
               ${configWarning}
               <p class="resource-feedback__status" data-feedback-status></p>
               <div class="resource-feedback__actions">
-                <button class="resource-feedback__back" type="button" data-feedback-back>Back</button>
+                <button class="resource-feedback__back" type="button" data-feedback-back>${backLabel}</button>
                 <button class="resource-feedback__submit" type="submit">Submit</button>
               </div>
             </form>
@@ -428,6 +449,43 @@ document.addEventListener("DOMContentLoaded", function () {
         return null;
     }
 
+    function ringContainsLatLng(latlng, ring) {
+        const x = latlng.lng;
+        const y = latlng.lat;
+        let inside = false;
+
+        for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+            const xi = Number(ring[i][0]);
+            const yi = Number(ring[i][1]);
+            const xj = Number(ring[j][0]);
+            const yj = Number(ring[j][1]);
+            const intersects = ((yi > y) !== (yj > y))
+                && (x < ((xj - xi) * (y - yi)) / (yj - yi) + xi);
+            if (intersects) inside = !inside;
+        }
+
+        return inside;
+    }
+
+    function polygonContainsLatLng(latlng, coordinates) {
+        if (!Array.isArray(coordinates?.[0]) || !ringContainsLatLng(latlng, coordinates[0])) return false;
+        return !coordinates.slice(1).some((ring) => ringContainsLatLng(latlng, ring));
+    }
+
+    function geometryContainsLatLng(latlng, geometry) {
+        if (geometry?.type === "Polygon") {
+            return polygonContainsLatLng(latlng, geometry.coordinates);
+        }
+        if (geometry?.type === "MultiPolygon") {
+            return geometry.coordinates.some((coordinates) => polygonContainsLatLng(latlng, coordinates));
+        }
+        return false;
+    }
+
+    function isInsideProjectBoundary(latlng) {
+        return data.project_area?.features?.some((feature) => geometryContainsLatLng(latlng, feature.geometry)) || false;
+    }
+
     function clearResourceToastPosition() {
         resourceToast.classList.remove("is-anchored", "is-left", "is-right");
         resourceToast.style.removeProperty("top");
@@ -504,6 +562,13 @@ document.addEventListener("DOMContentLoaded", function () {
             clearResourceToastPosition();
         });
         resourceToast.querySelector("[data-feedback-back]")?.addEventListener("click", () => {
+            if (properties.feedbackKind === "note_to_others") {
+                clearSelectedFeature();
+                resourceToast.classList.remove("is-open");
+                resourceToast.hidden = true;
+                clearResourceToastPosition();
+                return;
+            }
             showResourceToast(properties, style, latlng);
         });
         const form = resourceToast.querySelector("[data-feedback-form]");
@@ -536,6 +601,9 @@ document.addEventListener("DOMContentLoaded", function () {
         selectedFeatureAnchorLatLng = latLngForFeature(featureLayer, latlng);
         const element = featureElement(featureLayer);
         if (element) {
+            if (element.querySelector(".note-marker")) {
+                void element.offsetWidth;
+            }
             element.classList.add("is-selected");
         }
     }
@@ -557,6 +625,125 @@ document.addEventListener("DOMContentLoaded", function () {
             iconAnchor: [23, 23],
             popupAnchor: [0, -20],
             className: "cooling-div-icon"
+        });
+    }
+
+    function formatFeedbackMarkerLatLng(latlng) {
+        return `${latlng.lat.toFixed(6)},${latlng.lng.toFixed(6)}`;
+    }
+
+    function closeResourceToast() {
+        clearSelectedFeature();
+        resourceToast.classList.remove("is-open");
+        resourceToast.hidden = true;
+        clearResourceToastPosition();
+    }
+
+    function showBoundaryNote(latlng) {
+        if (isInsideProjectBoundary(latlng)) return;
+
+        clearSelectedFeature();
+        resourceToast.hidden = false;
+        resourceToast.classList.add("is-open");
+        selectedFeatureAnchorLatLng = latlng;
+        resourceToast.innerHTML = `
+            <button class="resource-toast__close" type="button" aria-label="Close message">&times;</button>
+            <div class="resource-popup">
+              <div class="popup-title">Outside the Project Area</div>
+              <div>Drop notes inside the main project boundary.</div>
+            </div>
+        `;
+        resourceToast.querySelector(".resource-toast__close").addEventListener("click", closeResourceToast);
+        window.requestAnimationFrame(positionResourceToast);
+    }
+
+    function dropNoteMarker(latlng) {
+        if (!isInsideProjectBoundary(latlng)) {
+            showBoundaryNote(latlng);
+            return;
+        }
+
+        const feedbackMarker = formatFeedbackMarkerLatLng(latlng);
+        const properties = {
+            name: "Note to others",
+            description: `Dropped pin at ${feedbackMarker}`,
+            feedbackKind: "note_to_others",
+            feedbackMarker
+        };
+        const style = {
+            ...pointStyles.noteMarker,
+            className: `${pointStyles.residentNeed.className} note-marker`,
+            popupType: "Note to others"
+        };
+
+        if (noteMarker) {
+            noteMarker.setLatLng(latlng);
+        } else {
+            noteMarker = L.marker(latlng, { icon: markerIcon(style) }).addTo(map);
+            noteMarker.on("click", () => {
+                const noteLatLng = noteMarker.getLatLng();
+                markSelectedFeature(noteMarker, noteLatLng);
+                showFeedbackToast(noteMarker.noteProperties, noteMarker.noteStyle, noteLatLng);
+            });
+        }
+        noteMarker.noteProperties = properties;
+        noteMarker.noteStyle = style;
+
+        markSelectedFeature(noteMarker, latlng);
+        showFeedbackToast(properties, style, latlng);
+    }
+
+    function setupDropNoteInteractions() {
+        map.getContainer().addEventListener("contextmenu", (event) => {
+            event.preventDefault();
+        });
+
+        map.on("contextmenu", (event) => {
+            if (event.originalEvent) {
+                event.originalEvent.preventDefault();
+            }
+            dropNoteMarker(event.latlng);
+        });
+
+        const container = map.getContainer();
+        let longPress = null;
+
+        const clearLongPress = () => {
+            if (longPress?.timer) {
+                window.clearTimeout(longPress.timer);
+            }
+            longPress = null;
+        };
+
+        container.addEventListener("pointerdown", (event) => {
+            if (event.pointerType === "mouse" || event.button !== 0) return;
+
+            const start = L.point(event.clientX, event.clientY);
+            const latlng = map.mouseEventToLatLng(event);
+            longPress = {
+                pointerId: event.pointerId,
+                start,
+                timer: window.setTimeout(() => {
+                    dropNoteMarker(latlng);
+                    clearLongPress();
+                }, 650)
+            };
+        });
+
+        container.addEventListener("pointermove", (event) => {
+            if (!longPress || longPress.pointerId !== event.pointerId) return;
+
+            const current = L.point(event.clientX, event.clientY);
+            if (current.distanceTo(longPress.start) > 12) {
+                clearLongPress();
+            }
+        });
+
+        ["pointerup", "pointercancel", "pointerleave"].forEach((eventName) => {
+            container.addEventListener(eventName, (event) => {
+                if (!longPress || longPress.pointerId !== event.pointerId) return;
+                clearLongPress();
+            });
         });
     }
 
@@ -1131,6 +1318,7 @@ document.addEventListener("DOMContentLoaded", function () {
     setupMobilePanelDrag();
     setupLegendLayerBridge();
     setupScenarioButtons();
+    setupDropNoteInteractions();
     setupParkSearch();
     setupLocationButton();
     setupWeatherWidget();

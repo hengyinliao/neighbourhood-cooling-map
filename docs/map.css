@@ -125,6 +125,7 @@ input {
     align-items: center;
     gap: 1rem;
     margin-bottom: 1rem;
+    text-decoration: none;
 }
 
 .logo-container p {
@@ -245,6 +246,40 @@ p {
     font-size: 1.1rem;
     font-weight: 600;
     margin-top: 1.5rem;
+}
+
+.map-feedback {
+    margin-top: 1.5rem;
+}
+
+.feedback-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    background: #4b84ca;
+    color: #fff;
+    font-weight: 700;
+    text-align: center;
+    text-decoration: none;
+}
+
+.feedback-button:hover {
+    background: #0b4f9f;
+}
+
+.feedback-button:focus-visible {
+    outline: 3px solid #76c6ff;
+    outline-offset: 3px;
+}
+
+.map-feedback p {
+    margin: 0.65rem 0 0;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    text-align: center;
 }
 
 .location-btn,
@@ -403,8 +438,8 @@ button.extreme-heat.selected img {
     padding-bottom: 4px;
     font-size: 12px;
     overflow-x: scroll;
-    position: absolute;
-    width: calc(max(20vw, 380px) - 3rem);
+    position: relative;
+    width: 100%;
     max-width: calc(100vw - 2rem);
     border-radius: 0;
     transition: width 0.3s ease, border-radius 0.3s ease;

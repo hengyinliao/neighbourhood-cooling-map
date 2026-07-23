@@ -23,8 +23,8 @@ source = "Vancouver Public Library"
 
 
 [layers.drinking_fountains]
-name = "{{name.replace('\n', ' ').lower().split('location:')[1].strip().title()}} Hydration Station"
-type = "{{name.replace('\n', ' ').lower().split('location:')[0].strip().title()}}"
+name = "{{(name.replace('\n', ' ').lower().partition('location')[2] or name).lstrip(' :').strip().title()}} Hydration Station"
+type = "{{name.replace('\n', ' ').lower().partition('location')[0].strip().title()}}"
 location = "{{location}}"
 operating_period = "{{in_operation or 'unknown'}}"
 pet_friendly = "{{pet_friendly == 'Y'}}"

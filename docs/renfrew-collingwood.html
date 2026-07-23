@@ -12,10 +12,10 @@
 <body>
   <main class="app">
     <aside class="panel left-panel">
-      <div class="logo-container">
+      <a class="logo-container" href="/">
         <img src="assets/logo.svg" alt="Our Neighbourhood Cooling Map logo" />
         <p>Find cool places.<br>Stay safe.<br>Help our community.</p>
-      </div>
+      </a>
 
       <section class="weather-widget" aria-label="Current weather" aria-live="polite">
         <div class="weather-widget__header">
@@ -105,6 +105,11 @@
           </div>
         </div>
       </section>
+
+      <div class="map-feedback">
+        <a class="feedback-button" href="https://docs.google.com/forms/d/e/1FAIpQLSfL3tyZVU6BP9MIxuAdcB_pFgB_JoiNPD7Vst6OxIApAnBGSA/viewform" target="_blank" rel="noopener noreferrer">Give Feedback For This App</a>
+        <p>To send feedback about map data, right-click the map or long-press it on mobile.</p>
+      </div>
     </aside>
 
     <div id="map" aria-label="Cooling resource map"></div>

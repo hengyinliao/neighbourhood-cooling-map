@@ -1,0 +1,19 @@
+# Central Region requested by Susan @ NSG
+[area_config]
+neighbourhood = "Central Vancouver"
+neighbourhood_areas = ["Riley Park", "Fairview", "Mount Pleasant", "Shaughnessy", "Kensington-Cedar Cottage", "South Cambie"]
+buffer_meters = 20
+
+[layer_visibility]
+parks = true
+community_centres = true
+libraries = true
+civic_cooling_places = true
+drinking_fountains = true
+public_washrooms = true
+rapid_transit_stations = true
+resident_input = false
+benches_osm = true
+transit_stops_osm = true
+shaded_walking_routes = true
+

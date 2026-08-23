@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/MarkerCluster.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/MarkerCluster.Default.css" />
-  <link rel="stylesheet" href="map.css?v=260722" />
+  <link rel="stylesheet" href="map.css?v=260823" />
 </head>
 <body>
   <main class="app">
@@ -40,7 +40,7 @@
         <p class="weather-widget__status" data-weather-status>Fetching weather conditions...</p>
       </section>
 
-      <section>
+      <section class="search-section">
         <h2>Search</h2>
         <div class="search-bridge">
           <input class="search" data-park-search placeholder="Search park name..." autocomplete="off" />
@@ -48,7 +48,7 @@
         <button class="location-btn" type="button" data-location-button>Use My Location</button>
       </section>
 
-      <section>
+      <section class="scenario-section">
         <h2>Scenario</h2>
         <div class="chips">
           <button class="general selected" type="button" data-scenario="all"><img src="assets/icons/user.svg" alt="">General</button>
@@ -118,6 +118,6 @@
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/leaflet.markercluster.js"></script>
   <script src="map_data_renfrew_collingwood.js"></script>
-  <script src="map.js"></script>
+  <script src="map.js?v=260823"></script>
 </body>
 </html>

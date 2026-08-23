@@ -72,6 +72,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const layerRegistry = new Map();
     const parkSearchRecords = [];
+    let selectedLegendButton = null;
+    let activeScenario = "all";
     const bufferMetres = data.config?.buffer_metres || 500;
     const contextLayerNames = [
         `Nearby area, within about ${bufferMetres} m`,
@@ -124,6 +126,7 @@ document.addEventListener("DOMContentLoaded", function () {
     resourceToast.setAttribute("aria-live", "polite");
     resourceToast.setAttribute("aria-label", "Selected map feature");
     document.body.appendChild(resourceToast);
+    let resourceToastCloseTimer = null;
     let selectedFeatureLayer = null;
     let selectedFeatureAnchorLatLng = null;
     const desktopToastQuery = window.matchMedia("(min-width: 761px)");
@@ -195,9 +198,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 return;
             }
 
-            const isVisible = map.hasLayer(entry.layer);
+            const isSelected = button === selectedLegendButton;
+            const isVisible = selectedLegendButton ? isSelected : map.hasLayer(entry.layer);
+            button.classList.toggle("is-selected", isSelected);
             button.classList.toggle("is-off", !isVisible);
-            button.setAttribute("aria-pressed", isVisible ? "true" : "false");
+            button.setAttribute("aria-pressed", isSelected ? "true" : "false");
             button.setAttribute("aria-label", `Toggle ${normalize(button.textContent)}`);
         });
     }
@@ -497,16 +502,24 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function handleResourceToastOpened() {
-        if (mobileCenterQuery.matches && collapseMobilePanelForToast && !restoreMobilePanelAfterToast) {
-            restoreMobilePanelAfterToast = collapseMobilePanelForToast();
-        }
+        document.querySelector(".left-panel")?.classList.toggle("is-toast-collapsed", mobileCenterQuery.matches);
     }
 
     function handleResourceToastClosed() {
-        if (restoreMobilePanelAfterToast) {
-            restoreMobilePanelAfterToast();
-            restoreMobilePanelAfterToast = null;
+        document.querySelector(".left-panel")?.classList.remove("is-toast-collapsed");
+    }
+
+    function openResourceToast() {
+        if (resourceToastCloseTimer) {
+            window.clearTimeout(resourceToastCloseTimer);
+            resourceToastCloseTimer = null;
         }
+        resourceToast.hidden = false;
+        handleResourceToastOpened();
+        positionResourceToast();
+        resourceToast.classList.remove("is-open", "is-closing");
+        void resourceToast.offsetWidth;
+        resourceToast.classList.add("is-open");
     }
 
     function positionResourceToast() {
@@ -545,9 +558,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function showResourceToast(properties, style = {}, latlng = null) {
-        resourceToast.hidden = false;
-        resourceToast.classList.add("is-open");
-        handleResourceToastOpened();
         resourceToast.innerHTML = `
             <button class="resource-toast__close" type="button" aria-label="Close selected feature">&times;</button>
             ${resourceDetailsHtml(properties, style, latlng)}
@@ -556,13 +566,10 @@ document.addEventListener("DOMContentLoaded", function () {
         resourceToast.querySelector("[data-feedback-button]")?.addEventListener("click", () => {
             showFeedbackToast(properties, style, latlng);
         });
-        window.requestAnimationFrame(positionResourceToast);
+        openResourceToast();
     }
 
     function showFeedbackToast(properties, style = {}, latlng = null) {
-        resourceToast.hidden = false;
-        resourceToast.classList.add("is-open");
-        handleResourceToastOpened();
         resourceToast.innerHTML = `
             <button class="resource-toast__close" type="button" aria-label="Close selected feature">&times;</button>
             ${feedbackFormHtml(properties, style)}
@@ -582,7 +589,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 submitFeedbackForm(form);
             });
         }
-        window.requestAnimationFrame(positionResourceToast);
+        openResourceToast();
     }
 
     function featureElement(featureLayer) {
@@ -639,18 +646,20 @@ document.addEventListener("DOMContentLoaded", function () {
     function closeResourceToast() {
         clearSelectedFeature();
         resourceToast.classList.remove("is-open");
-        resourceToast.hidden = true;
-        clearResourceToastPosition();
+        resourceToast.classList.add("is-closing");
         handleResourceToastClosed();
+        resourceToastCloseTimer = window.setTimeout(() => {
+            resourceToast.hidden = true;
+            resourceToast.classList.remove("is-closing");
+            clearResourceToastPosition();
+            resourceToastCloseTimer = null;
+        }, 240);
     }
 
     function showBoundaryNote(latlng) {
         if (isInsideProjectBoundary(latlng)) return;
 
         clearSelectedFeature();
-        resourceToast.hidden = false;
-        resourceToast.classList.add("is-open");
-        handleResourceToastOpened();
         selectedFeatureAnchorLatLng = latlng;
         resourceToast.innerHTML = `
             <button class="resource-toast__close" type="button" aria-label="Close message">&times;</button>
@@ -660,7 +669,7 @@ document.addEventListener("DOMContentLoaded", function () {
             </div>
         `;
         resourceToast.querySelector(".resource-toast__close").addEventListener("click", closeResourceToast);
-        window.requestAnimationFrame(positionResourceToast);
+        openResourceToast();
     }
 
     function dropNoteMarker(latlng) {
@@ -1086,7 +1095,20 @@ document.addEventListener("DOMContentLoaded", function () {
             button.addEventListener("click", () => {
                 const entry = getRegisteredLayer(button.dataset.layer);
                 if (!entry) return;
-                setLayerVisible(entry.name, !map.hasLayer(entry.layer));
+
+                if (selectedLegendButton === button) {
+                    selectedLegendButton = null;
+                    applyScenarioLayerPreset(activeScenario);
+                    return;
+                }
+
+                selectedLegendButton = button;
+                const selectedLayerName = normalize(entry.name);
+                layerRegistry.forEach((registeredEntry, layerName) => {
+                    const shouldShow = contextLayerNames.map(normalize).includes(layerName)
+                        || layerName === selectedLayerName;
+                    setLayerVisible(registeredEntry.name, shouldShow);
+                });
                 syncLegendState();
             });
         });
@@ -1106,7 +1128,8 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function setScenario(scenario) {
-        const activeScenario = scenarioLayerPresets[scenario] ? scenario : "all";
+        activeScenario = scenarioLayerPresets[scenario] ? scenario : "all";
+        selectedLegendButton = null;
         document.body.classList.remove("scenario-senior", "scenario-family", "scenario-heat", "scenario-resident");
         if (activeScenario !== "all") {
             document.body.classList.add(`scenario-${activeScenario}`);
@@ -1354,6 +1377,201 @@ document.addEventListener("DOMContentLoaded", function () {
         fetchWeather(weatherLocation).catch(showWeatherError);
     }
 
+    function setupAccessibilityControl() {
+        const storageKey = "coolingMapAccessibility";
+        const defaults = {
+            largerText: false,
+            largerControls: false,
+            highContrast: false,
+            dyslexia: false,
+            side: "right",
+            top: 0.5
+        };
+        let settings = { ...defaults };
+
+        try {
+            settings = { ...defaults, ...JSON.parse(localStorage.getItem(storageKey) || "{}") };
+        } catch (error) {
+            console.warn("Accessibility preferences could not be loaded.", error);
+        }
+
+        const control = document.createElement("div");
+        control.className = "accessibility-control";
+        control.innerHTML = `
+            <button class="accessibility-button" type="button" aria-label="Accessibility settings" aria-expanded="false" aria-controls="accessibility-settings-panel">
+              <img src="assets/icons/accessibility.svg" alt="" aria-hidden="true" />
+            </button>
+            <section class="accessibility-panel" id="accessibility-settings-panel" aria-label="Accessibility settings" hidden>
+              <div class="accessibility-panel__header">
+                <h2>Accessibility</h2>
+                <button class="accessibility-panel__close" type="button" aria-label="Close accessibility settings">&times;</button>
+              </div>
+              <label><input type="checkbox" data-accessibility-setting="largerText" /> Larger text</label>
+              <label><input type="checkbox" data-accessibility-setting="largerControls" /> Larger icons and buttons</label>
+              <label><input type="checkbox" data-accessibility-setting="highContrast" /> High contrast colors</label>
+              <label><input type="checkbox" data-accessibility-setting="dyslexia" /> Dyslexia-friendly text</label>
+              <button class="accessibility-reset" type="button">Reset settings</button>
+            </section>
+        `;
+        document.body.appendChild(control);
+
+        const button = control.querySelector(".accessibility-button");
+        const panel = control.querySelector(".accessibility-panel");
+        const closeButton = control.querySelector(".accessibility-panel__close");
+        const resetButton = control.querySelector(".accessibility-reset");
+        const inputs = [...control.querySelectorAll("[data-accessibility-setting]")];
+        let dragState = null;
+        let suppressClick = false;
+
+        const save = () => localStorage.setItem(storageKey, JSON.stringify(settings));
+        const enforceDesktopFontExclusivity = (preferredSetting = "dyslexia") => {
+            if (mobileCenterQuery.matches || !settings.largerText || !settings.dyslexia) return false;
+
+            if (preferredSetting === "largerText") {
+                settings.dyslexia = false;
+            } else {
+                settings.largerText = false;
+            }
+            return true;
+        };
+        const expandMobileLegend = () => {
+            const hasEnabledOption = settings.largerText
+                || settings.largerControls
+                || settings.highContrast
+                || settings.dyslexia;
+            if (!mobileCenterQuery.matches || !hasEnabledOption) return;
+
+            document.querySelectorAll(".legend").forEach((legend) => {
+                legend.setAttribute("aria-expanded", "true");
+                legend.classList.add("extended");
+            });
+            document.querySelectorAll(".legend-toggle").forEach((toggle) => {
+                toggle.setAttribute("aria-expanded", "true");
+                toggle.setAttribute("aria-label", "Collapse cooling nearby legend");
+            });
+        };
+        const apply = () => {
+            const hasEnabledOption = settings.largerText
+                || settings.largerControls
+                || settings.highContrast
+                || settings.dyslexia;
+            document.body.classList.toggle("a11y-larger-text", settings.largerText);
+            document.body.classList.toggle("a11y-larger-controls", settings.largerControls);
+            document.body.classList.toggle("a11y-high-contrast", settings.highContrast);
+            document.body.classList.toggle("a11y-dyslexia", settings.dyslexia);
+            document.body.classList.toggle("a11y-options-active", hasEnabledOption);
+            inputs.forEach((input) => {
+                input.checked = Boolean(settings[input.dataset.accessibilitySetting]);
+            });
+            expandMobileLegend();
+        };
+        const positionControl = () => {
+            const buttonHeight = button.offsetHeight || 56;
+            const maxTop = Math.max(8, window.innerHeight - buttonHeight - 8);
+            const top = Math.max(8, Math.min(maxTop, settings.top * window.innerHeight));
+            control.style.top = `${top}px`;
+            control.classList.toggle("is-left", settings.side === "left");
+            control.classList.toggle("is-right", settings.side !== "left");
+        };
+        const closePanel = () => {
+            panel.hidden = true;
+            button.setAttribute("aria-expanded", "false");
+        };
+        const togglePanel = () => {
+            panel.hidden = !panel.hidden;
+            button.setAttribute("aria-expanded", panel.hidden ? "false" : "true");
+            if (!panel.hidden) {
+                const controlRect = control.getBoundingClientRect();
+                const panelHeight = panel.offsetHeight;
+                const panelTop = Math.max(8, Math.min(controlRect.top, window.innerHeight - panelHeight - 8));
+                panel.style.top = `${panelTop - controlRect.top}px`;
+                closeButton.focus();
+            }
+        };
+
+        inputs.forEach((input) => {
+            input.addEventListener("change", () => {
+                const setting = input.dataset.accessibilitySetting;
+                settings[setting] = input.checked;
+                if (input.checked && (setting === "largerText" || setting === "dyslexia")) {
+                    enforceDesktopFontExclusivity(setting);
+                }
+                apply();
+                save();
+            });
+        });
+        resetButton.addEventListener("click", () => {
+            settings = { ...defaults, side: settings.side, top: settings.top };
+            apply();
+            save();
+        });
+        closeButton.addEventListener("click", closePanel);
+        button.addEventListener("click", (event) => {
+            if (suppressClick) {
+                suppressClick = false;
+                event.preventDefault();
+                return;
+            }
+            togglePanel();
+        });
+        button.addEventListener("pointerdown", (event) => {
+            if (event.button > 0) return;
+            const rect = button.getBoundingClientRect();
+            dragState = {
+                pointerId: event.pointerId,
+                startX: event.clientX,
+                startY: event.clientY,
+                offsetX: event.clientX - rect.left,
+                offsetY: event.clientY - rect.top,
+                moved: false
+            };
+            button.setPointerCapture(event.pointerId);
+        });
+        button.addEventListener("pointermove", (event) => {
+            if (!dragState || dragState.pointerId !== event.pointerId) return;
+            const left = Math.max(0, Math.min(window.innerWidth - button.offsetWidth, event.clientX - dragState.offsetX));
+            const top = Math.max(8, Math.min(window.innerHeight - button.offsetHeight - 8, event.clientY - dragState.offsetY));
+            dragState.moved = dragState.moved
+                || Math.hypot(event.clientX - dragState.startX, event.clientY - dragState.startY) > 4;
+            control.style.left = `${left}px`;
+            control.style.right = "auto";
+            control.style.top = `${top}px`;
+        });
+        const finishDrag = (event) => {
+            if (!dragState || dragState.pointerId !== event.pointerId) return;
+            suppressClick = dragState.moved;
+            const rect = button.getBoundingClientRect();
+            settings.side = rect.left + rect.width / 2 < window.innerWidth / 2 ? "left" : "right";
+            settings.top = Math.max(0, Math.min(1, rect.top / window.innerHeight));
+            control.style.removeProperty("left");
+            control.style.removeProperty("right");
+            dragState = null;
+            positionControl();
+            save();
+        };
+        button.addEventListener("pointerup", finishDrag);
+        button.addEventListener("pointercancel", finishDrag);
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape" && !panel.hidden) {
+                closePanel();
+                button.focus();
+            }
+        });
+        window.addEventListener("resize", () => {
+            positionControl();
+            if (enforceDesktopFontExclusivity()) {
+                apply();
+                save();
+            }
+            expandMobileLegend();
+        });
+
+        enforceDesktopFontExclusivity();
+        apply();
+        save();
+        positionControl();
+    }
+
     map.on("move zoom resize", positionResourceToast);
     window.addEventListener("resize", positionResourceToast);
     if (desktopToastQuery.addEventListener) {
@@ -1367,11 +1585,11 @@ document.addEventListener("DOMContentLoaded", function () {
     addShadedRouteLayer();
     addPointLayers();
     setupLegendExpansionToggle();
-    setupMobilePanelDrag();
     setupLegendLayerBridge();
     setupScenarioButtons();
     setupDropNoteInteractions();
     setupParkSearch();
     setupLocationButton();
     setupWeatherWidget();
+    setupAccessibilityControl();
 });
